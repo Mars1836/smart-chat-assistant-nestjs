@@ -16,8 +16,10 @@ import { WorkspaceMembersModule } from './modules/workspace-members/workspace-me
 import { AuthModule } from './modules/auth/auth.module';
 import { SystemRolesModule } from './modules/system-roles/system-roles.module';
 import { WorkspaceRolesModule } from './modules/workspace-roles/workspace-roles.module';
-import { WorkspacePermissionsModule } from './modules/workspace-permissions/workspace-permissions.module';
 import { WorkspaceMemberPermissionsModule } from './modules/workspace-member-permissions/workspace-member-permissions.module';
+import { WorkspaceRolePermissionsModule } from './modules/workspace-role-permissions/workspace-role-permissions.module';
+import { WorkspacePermissionsModule } from './modules/workspace-permissions/workspace-permissions.module';
+import { RbacSeedModule } from './modules/rbac-seed/rbac-seed.module';
 import { ChatbotsModule } from './modules/chatbots/chatbots.module';
 import { CustomIntentsModule } from './modules/custom-intents/custom-intents.module';
 import { CustomResponsesModule } from './modules/custom-responses/custom-responses.module';
@@ -47,7 +49,9 @@ import { BaseEntitySubscriber } from './common/subscribers';
     SystemRolesModule,
     WorkspaceRolesModule,
     WorkspacePermissionsModule,
+    WorkspaceRolePermissionsModule,
     WorkspaceMemberPermissionsModule,
+    RbacSeedModule,
     // Core Modules
     UsersModule,
     WorkspacesModule,

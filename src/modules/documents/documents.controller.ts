@@ -35,10 +35,13 @@ import {
   PaginatedResponseDto,
   PaginationMetaDto,
 } from '../../common/dto';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 
 @ApiTags('documents')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
@@ -73,8 +76,9 @@ export class DocumentsController {
     description: 'Document uploaded successfully',
     type: DocumentResponseDto,
   })
-  @ApiResponse({ status: 403, description: 'Only owner can upload documents' })
   @ApiResponse({ status: 413, description: 'File too large' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_UPLOAD)
   async create(
     @Param('workspaceId') workspaceId: string,
     @User('sub') userId: string,
@@ -144,6 +148,7 @@ export class DocumentsController {
       },
     },
   })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_VIEW)
   findAll(
     @Param('workspaceId') workspaceId: string,
     @User('sub') userId: string,
@@ -164,6 +169,8 @@ export class DocumentsController {
     type: DocumentResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Document not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_VIEW)
   findOne(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
@@ -179,7 +186,8 @@ export class DocumentsController {
     description: 'Document updated successfully',
     type: DocumentResponseDto,
   })
-  @ApiResponse({ status: 403, description: 'Cannot update this document' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_UPDATE)
   update(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
@@ -197,7 +205,8 @@ export class DocumentsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa document' })
   @ApiResponse({ status: 200, description: 'Document deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Only owner can delete documents' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_DELETE)
   remove(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,

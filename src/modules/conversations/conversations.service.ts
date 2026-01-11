@@ -12,6 +12,8 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
+import { WorkspacePermissionsService } from '../workspace-permissions/workspace-permissions.service';
+import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 
 @Injectable()
 export class ConversationsService extends BaseService<Conversation> {
@@ -22,6 +24,7 @@ export class ConversationsService extends BaseService<Conversation> {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
+    private readonly permissionsService: WorkspacePermissionsService,
   ) {
     super();
   }
@@ -37,38 +40,41 @@ export class ConversationsService extends BaseService<Conversation> {
     userId: string,
     createConversationDto: CreateConversationDto,
   ): Promise<Conversation> {
-    // Kiểm tra workspace tồn tại
-    const workspace = await this.workspaceRepository.findOne({
-      where: { id: createConversationDto.workspace_id },
-    });
+    const workspaceId = createConversationDto.workspace_id;
 
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
+    // Check member access (read access to workspace)
+    // Any active member can start a conversation
+    const canAccess = await this.permissionsService.checkPermission(
+      workspaceId,
+      userId,
+      WORKSPACE_PERMISSIONS.CHATBOT_CHAT, // Need chat permission to start conversation
+    );
 
-    // Kiểm tra user có quyền truy cập workspace
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('You do not have access to this workspace');
+    if (!canAccess) {
+      throw new ForbiddenException(
+        'You do not have permission to chat in this workspace',
+      );
     }
 
     // Kiểm tra chatbot tồn tại và thuộc workspace
     const chatbot = await this.chatbotRepository.findOne({
       where: {
         id: createConversationDto.chatbot_id,
-        workspace_id: createConversationDto.workspace_id,
+        workspace_id: workspaceId,
+        enabled: true,
       },
     });
 
     if (!chatbot) {
-      throw new NotFoundException('Chatbot not found in this workspace');
+      throw new NotFoundException('Chatbot not found or disabled');
     }
 
     // Tạo conversation
-    // created_by_id sẽ được tự động thêm bởi BaseEntitySubscriber
     const conversation = this.conversationRepository.create({
-      workspace_id: createConversationDto.workspace_id,
+      workspace_id: workspaceId,
       user_id: userId,
       chatbot_id: createConversationDto.chatbot_id,
+      started_at: new Date(),
     });
 
     return await this.conversationRepository.save(conversation);
@@ -82,17 +88,31 @@ export class ConversationsService extends BaseService<Conversation> {
     userId: string,
     pagination: PaginationDto,
   ): Promise<PaginatedResult<Conversation>> {
-    // Kiểm tra workspace và quyền truy cập
-    const workspace = await this.workspaceRepository.findOne({
-      where: { id: workspaceId },
-    });
+    // Check if user is Owner/Admin using MEMBER_VIEW (or similar high-level permission)
+    // Owners and Admins can view all member conversations
+    const canViewAll = await this.permissionsService.checkPermission(
+      workspaceId,
+      userId,
+      WORKSPACE_PERMISSIONS.MEMBER_UPDATE_ROLE, // Only Admin/Owner has this
+    );
 
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
+    // Default where clause
+    const where: any = { workspace_id: workspaceId };
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('You do not have access to this workspace');
+    // If not admin/owner, restrict to own conversations
+    if (!canViewAll) {
+      // Check basic access first
+      const hasAccess = await this.permissionsService.checkPermission(
+        workspaceId,
+        userId,
+        WORKSPACE_PERMISSIONS.CHATBOT_CHAT, // Basic member access
+      );
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          'You do not have access to this workspace conversations',
+        );
+      }
+      where.user_id = userId;
     }
 
     // Set default sort if not provided
@@ -102,7 +122,7 @@ export class ConversationsService extends BaseService<Conversation> {
     }
 
     return this.paginate(pagination, {
-      where: { workspace_id: workspaceId },
+      where,
       relations: ['user', 'chatbot'],
     });
   }

@@ -33,10 +33,13 @@ import {
   PaginatedResponseDto,
   PaginationMetaDto,
 } from '../../common/dto';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 
 @ApiTags('chatbots')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/chatbots')
 export class ChatbotsController {
   constructor(private readonly chatbotsService: ChatbotsService) {}
@@ -48,7 +51,8 @@ export class ChatbotsController {
     description: 'Chatbot created successfully',
     type: Chatbot,
   })
-  @ApiResponse({ status: 403, description: 'Only owner can create chatbot' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_CREATE)
   create(
     @Param('workspaceId') workspaceId: string,
     @User('sub') userId: string,
@@ -108,10 +112,11 @@ export class ChatbotsController {
           totalPages: 5,
           hasNextPage: true,
           hasPreviousPage: false,
-        },
+          },
       },
     },
   })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
   findAll(
     @Param('workspaceId') workspaceId: string,
     @Query() pagination: PaginationDto,
@@ -127,6 +132,8 @@ export class ChatbotsController {
     type: Chatbot,
   })
   @ApiResponse({ status: 404, description: 'Chatbot not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
   findOne(@Param('workspaceId') workspaceId: string, @Param('id') id: string) {
     return this.chatbotsService.findOne(workspaceId, id);
   }
@@ -138,7 +145,8 @@ export class ChatbotsController {
     description: 'Chatbot updated successfully',
     type: Chatbot,
   })
-  @ApiResponse({ status: 403, description: 'Only owner can update chatbot' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
   update(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
@@ -156,7 +164,8 @@ export class ChatbotsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa chatbot' })
   @ApiResponse({ status: 200, description: 'Chatbot deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Only owner can delete chatbot' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_DELETE)
   remove(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
@@ -172,7 +181,8 @@ export class ChatbotsController {
     description: 'Chat response',
     type: ChatResponseDto,
   })
-  @ApiResponse({ status: 403, description: 'Chatbot is disabled' })
+  @ApiResponse({ status: 403, description: 'Forbidden or Chatbot disabled' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_CHAT)
   chat(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,

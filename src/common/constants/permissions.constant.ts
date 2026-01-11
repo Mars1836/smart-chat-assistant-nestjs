@@ -1,44 +1,39 @@
-export const GROUP_PERMISSIONS = {
-  // Group Management
-  GROUP_UPDATE: 'group.update',
-  GROUP_DELETE: 'group.delete',
-  GROUP_SETTINGS: 'group.settings',
+export const WORKSPACE_PERMISSIONS = {
+  // Workspace Management
+  WORKSPACE_UPDATE: 'workspace.update',
+  WORKSPACE_DELETE: 'workspace.delete',
+  WORKSPACE_VIEW_SETTINGS: 'workspace.view_settings',
 
   // Member Management
   MEMBER_INVITE: 'member.invite',
   MEMBER_REMOVE: 'member.remove',
-  MEMBER_ROLE: 'member.role',
+  MEMBER_UPDATE_ROLE: 'member.update_role',
   MEMBER_VIEW: 'member.view',
 
-  // Chatbot Management
-  CHATBOT_CONFIGURE: 'chatbot.configure',
-  CHATBOT_TRAIN: 'chatbot.train',
-  CHATBOT_ENABLE: 'chatbot.enable',
+  // Chatbot Resources
+  CHATBOT_CREATE: 'chatbot.create',
+  CHATBOT_UPDATE: 'chatbot.update',
+  CHATBOT_DELETE: 'chatbot.delete',
+  CHATBOT_VIEW: 'chatbot.view',
+  CHATBOT_CHAT: 'chatbot.chat',
   CHATBOT_VIEW_LOGS: 'chatbot.view_logs',
-  CHATBOT_DELETE_DATA: 'chatbot.delete_data',
 
-  // Email Features
-  EMAIL_SEND: 'email.send',
-  EMAIL_SEND_GROUP: 'email.send_group',
-  EMAIL_CONFIGURE: 'email.configure',
-  EMAIL_VIEW_HISTORY: 'email.view_history',
-
-  // Calendar Features
-  CALENDAR_CREATE: 'calendar.create',
-  CALENDAR_EDIT: 'calendar.edit',
-  CALENDAR_DELETE: 'calendar.delete',
-  CALENDAR_VIEW: 'calendar.view',
-
-  // Document Management
+  // Document Resources
   DOCUMENT_UPLOAD: 'document.upload',
+  DOCUMENT_UPDATE: 'document.update',
   DOCUMENT_DELETE: 'document.delete',
   DOCUMENT_VIEW: 'document.view',
-
-  // Chat Features
-  CHAT_SEND: 'chat.send',
-  CHAT_DELETE: 'chat.delete',
-  CHAT_VIEW_HISTORY: 'chat.view_history',
 } as const;
 
-export type GroupPermission =
-  (typeof GROUP_PERMISSIONS)[keyof typeof GROUP_PERMISSIONS];
+export type WorkspacePermissionType =
+  (typeof WORKSPACE_PERMISSIONS)[keyof typeof WORKSPACE_PERMISSIONS];
+
+export const WORKSPACE_ROLES = {
+  OWNER: 'Owner',
+  ADMIN: 'Admin',
+  EDITOR: 'Editor',
+  VIEWER: 'Viewer',
+} as const;
+
+export type WorkspaceRoleType =
+  (typeof WORKSPACE_ROLES)[keyof typeof WORKSPACE_ROLES];
