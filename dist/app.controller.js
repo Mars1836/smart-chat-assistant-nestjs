@@ -8,10 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const app_service_1 = require("./app.service");
+const swagger_1 = require("@nestjs/swagger");
 let AppController = class AppController {
     appService;
     constructor(appService) {
@@ -20,15 +25,57 @@ let AppController = class AppController {
     getHello() {
         return this.appService.getHello();
     }
+    getApiSchema(module) {
+        return this.appService.getApiJson(module);
+    }
+    getModules() {
+        return {
+            modules: this.appService.getModules(),
+        };
+    }
 };
 exports.AppController = AppController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200, type: String }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], AppController.prototype, "getHello", null);
+__decorate([
+    (0, common_1.Get)('api-schema'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy JSON schema của API' }),
+    (0, swagger_1.ApiQuery)({
+        name: 'module',
+        required: false,
+        description: 'Tên module (tag) để lọc API. Ví dụ: chatbots, auth, workspaces',
+        example: 'chatbots',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'API schema JSON',
+    }),
+    openapi.ApiResponse({ status: 200, type: Object }),
+    __param(0, (0, common_1.Query)('module')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Object)
+], AppController.prototype, "getApiSchema", null);
+__decorate([
+    (0, common_1.Get)('api-modules'),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách tất cả các modules có sẵn' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Danh sách modules',
+        type: [String],
+    }),
+    openapi.ApiResponse({ status: 200 }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "getModules", null);
 exports.AppController = AppController = __decorate([
+    (0, swagger_1.ApiTags)('api-schema'),
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [app_service_1.AppService])
 ], AppController);

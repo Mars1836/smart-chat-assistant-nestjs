@@ -3,16 +3,26 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersModule } from './users/users.module';
-import { GroupsModule } from './groups/groups.module';
-import { ConversationsModule } from './conversations/conversations.module';
-import { MessagesModule } from './messages/messages.module';
-import { IntentsModule } from './intents/intents.module';
-import { ActionsModule } from './actions/actions.module';
-import { DocumentsModule } from './documents/documents.module';
-import { EventsModule } from './events/events.module';
-import { PaymentsModule } from './payments/payments.module';
-import { GroupMembersModule } from './group-members/group-members.module';
+import { UsersModule } from './modules/users/users.module';
+import { WorkspacesModule } from './modules/workspaces/workspaces.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { IntentsModule } from './modules/intents/intents.module';
+import { ActionsModule } from './modules/actions/actions.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { EventsModule } from './modules/events/events.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { WorkspaceMembersModule } from './modules/workspace-members/workspace-members.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { SystemRolesModule } from './modules/system-roles/system-roles.module';
+import { WorkspaceRolesModule } from './modules/workspace-roles/workspace-roles.module';
+import { WorkspacePermissionsModule } from './modules/workspace-permissions/workspace-permissions.module';
+import { WorkspaceMemberPermissionsModule } from './modules/workspace-member-permissions/workspace-member-permissions.module';
+import { ChatbotsModule } from './modules/chatbots/chatbots.module';
+import { CustomIntentsModule } from './modules/custom-intents/custom-intents.module';
+import { CustomResponsesModule } from './modules/custom-responses/custom-responses.module';
+import { TrainingDataModule } from './modules/training-data/training-data.module';
+import { BaseEntitySubscriber } from './common/subscribers';
 
 @Module({
   imports: [
@@ -30,18 +40,34 @@ import { GroupMembersModule } from './group-members/group-members.module';
         database: process.env.DB_NAME ?? 'chatbot',
         autoLoadEntities: true,
         synchronize: true,
+        subscribers: [BaseEntitySubscriber],
       }),
     }),
+    // RBAC Modules
+    SystemRolesModule,
+    WorkspaceRolesModule,
+    WorkspacePermissionsModule,
+    WorkspaceMemberPermissionsModule,
+    // Core Modules
     UsersModule,
-    GroupsModule,
+    WorkspacesModule,
+    WorkspaceMembersModule,
+    // Chatbot Modules
+    ChatbotsModule,
+    CustomIntentsModule,
+    CustomResponsesModule,
+    TrainingDataModule,
+    // Chat Modules
     ConversationsModule,
     MessagesModule,
     IntentsModule,
     ActionsModule,
+    // Integration Modules
     DocumentsModule,
     EventsModule,
     PaymentsModule,
-    GroupMembersModule,
+    // Auth Module
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

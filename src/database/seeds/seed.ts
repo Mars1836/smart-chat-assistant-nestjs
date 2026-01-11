@@ -1,0 +1,60 @@
+import { DataSource } from 'typeorm';
+import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+import { config } from 'dotenv';
+import { seedRBAC } from './rbac.seed';
+
+// Load environment variables
+config();
+
+const dataSourceOptions: PostgresConnectionOptions = {
+  type: 'postgres',
+  host: process.env.DB_HOST ?? 'localhost',
+  port: Number(process.env.DB_PORT ?? 5432),
+  username: process.env.DB_USERNAME ?? 'postgres',
+  password: process.env.DB_PASSWORD ?? 'postgres',
+  database: process.env.DB_NAME ?? 'chatbot',
+  entities: ['src/modules/**/*.entity.ts'],
+  synchronize: false, // Don't auto sync in seed script
+};
+
+async function runSeeds(): Promise<void> {
+  console.log('🚀 Starting database seeding...\n');
+  console.log('📝 Database config:', {
+    host: dataSourceOptions.host,
+    port: dataSourceOptions.port,
+    database: dataSourceOptions.database,
+  });
+  console.log('');
+
+  const dataSource = new DataSource(dataSourceOptions);
+
+  try {
+    await dataSource.initialize();
+    console.log('✓ Database connected\n');
+
+    // Run RBAC seeds
+    await seedRBAC(dataSource);
+
+    // Add more seed functions here as needed
+    // await seedUsers(dataSource);
+    // await seedGroups(dataSource);
+
+    console.log('🎉 All seeds completed successfully!');
+  } catch (error) {
+    console.error('❌ Error during seeding:', error);
+    throw error;
+  } finally {
+    await dataSource.destroy();
+    console.log('✓ Database connection closed');
+  }
+}
+
+// Run seeds
+void runSeeds()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
