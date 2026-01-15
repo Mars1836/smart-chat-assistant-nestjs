@@ -19,12 +19,14 @@ import { WorkspaceRolesModule } from './modules/workspace-roles/workspace-roles.
 import { WorkspaceMemberPermissionsModule } from './modules/workspace-member-permissions/workspace-member-permissions.module';
 import { WorkspaceRolePermissionsModule } from './modules/workspace-role-permissions/workspace-role-permissions.module';
 import { WorkspacePermissionsModule } from './modules/workspace-permissions/workspace-permissions.module';
+import { WorkspaceInvitationsModule } from './modules/workspace-invitations/workspace-invitations.module';
 import { RbacSeedModule } from './modules/rbac-seed/rbac-seed.module';
 import { ChatbotsModule } from './modules/chatbots/chatbots.module';
 import { CustomIntentsModule } from './modules/custom-intents/custom-intents.module';
 import { CustomResponsesModule } from './modules/custom-responses/custom-responses.module';
 import { TrainingDataModule } from './modules/training-data/training-data.module';
 import { BaseEntitySubscriber } from './common/subscribers';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -56,6 +58,7 @@ import { BaseEntitySubscriber } from './common/subscribers';
     UsersModule,
     WorkspacesModule,
     WorkspaceMembersModule,
+    WorkspaceInvitationsModule,
     // Chatbot Modules
     ChatbotsModule,
     CustomIntentsModule,
@@ -70,8 +73,9 @@ import { BaseEntitySubscriber } from './common/subscribers';
     DocumentsModule,
     EventsModule,
     PaymentsModule,
-    // Auth Module
+    // Auth & Mail Modules
     AuthModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

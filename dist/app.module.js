@@ -28,12 +28,14 @@ const workspace_roles_module_1 = require("./modules/workspace-roles/workspace-ro
 const workspace_member_permissions_module_1 = require("./modules/workspace-member-permissions/workspace-member-permissions.module");
 const workspace_role_permissions_module_1 = require("./modules/workspace-role-permissions/workspace-role-permissions.module");
 const workspace_permissions_module_1 = require("./modules/workspace-permissions/workspace-permissions.module");
+const workspace_invitations_module_1 = require("./modules/workspace-invitations/workspace-invitations.module");
 const rbac_seed_module_1 = require("./modules/rbac-seed/rbac-seed.module");
 const chatbots_module_1 = require("./modules/chatbots/chatbots.module");
 const custom_intents_module_1 = require("./modules/custom-intents/custom-intents.module");
 const custom_responses_module_1 = require("./modules/custom-responses/custom-responses.module");
 const training_data_module_1 = require("./modules/training-data/training-data.module");
 const subscribers_1 = require("./common/subscribers");
+const mail_module_1 = require("./modules/mail/mail.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -66,6 +68,7 @@ exports.AppModule = AppModule = __decorate([
             users_module_1.UsersModule,
             workspaces_module_1.WorkspacesModule,
             workspace_members_module_1.WorkspaceMembersModule,
+            workspace_invitations_module_1.WorkspaceInvitationsModule,
             chatbots_module_1.ChatbotsModule,
             custom_intents_module_1.CustomIntentsModule,
             custom_responses_module_1.CustomResponsesModule,
@@ -78,6 +81,7 @@ exports.AppModule = AppModule = __decorate([
             events_module_1.EventsModule,
             payments_module_1.PaymentsModule,
             auth_module_1.AuthModule,
+            mail_module_1.MailModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

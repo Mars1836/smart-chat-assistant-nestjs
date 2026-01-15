@@ -1,7 +1,6 @@
 import { DataSource } from 'typeorm';
 import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { config } from 'dotenv';
-import { seedRBAC } from './rbac.seed';
 
 // Load environment variables
 config();
@@ -32,12 +31,13 @@ async function runSeeds(): Promise<void> {
     await dataSource.initialize();
     console.log('✓ Database connected\n');
 
-    // Run RBAC seeds
-    await seedRBAC(dataSource);
-
-    // Add more seed functions here as needed
+    // NOTE: RBAC seeding is now handled automatically by RbacSeedService (OnModuleInit)
+    // No manual seeding needed for roles, permissions, and role-permissions
+    console.log('ℹ️  RBAC data will be seeded automatically when app starts (RbacSeedService)');
+    
+    // Add other seed functions here as needed
     // await seedUsers(dataSource);
-    // await seedGroups(dataSource);
+    // await seedWorkspaces(dataSource);
 
     console.log('🎉 All seeds completed successfully!');
   } catch (error) {
