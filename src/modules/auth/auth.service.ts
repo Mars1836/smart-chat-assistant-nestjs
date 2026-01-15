@@ -15,6 +15,7 @@ import {
   AuthResponseDto,
   RefreshResponseDto,
   ProfileResponseDto,
+  ChangePasswordDto,
 } from './dto';
 import { User } from '../users/entities/user.entity';
 
@@ -128,5 +129,28 @@ export class AuthService {
   profile(userId: string): ProfileResponseDto {
     // TODO: Replace with real user lookup from database
     return { id: userId, email: 'user@example.com', name: 'User' };
+  }
+
+  async changePassword(
+    email: string,
+    newPassword: string,
+  ): Promise<void> {
+    // Find user by email
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Hash new password
+    const saltRounds =
+      this.configService.get<number>('BCRYPT_SALT_ROUNDS') ?? 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    user.password = hashedPassword;
+    await this.userRepository.save(user);
   }
 }

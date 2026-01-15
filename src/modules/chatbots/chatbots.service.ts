@@ -55,9 +55,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can create chatbot');
-    }
+    // Permission check handled by PermissionsGuard
 
     // TODO: Có thể thêm giới hạn số lượng chatbot theo plan
     // const count = await this.chatbotRepo.count({ where: { workspace_id: workspaceId } });
@@ -160,9 +158,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can update chatbot');
-    }
+    // Permission check handled by PermissionsGuard
 
     const chatbot = await this.chatbotRepo.findOne({
       where: { id: chatbotId, workspace_id: workspaceId },
@@ -193,9 +189,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can delete chatbot');
-    }
+    // Permission check handled by PermissionsGuard
 
     const chatbot = await this.chatbotRepo.findOne({
       where: { id: chatbotId, workspace_id: workspaceId },

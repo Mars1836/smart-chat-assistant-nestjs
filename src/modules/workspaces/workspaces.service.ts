@@ -95,11 +95,7 @@ export class WorkspacesService extends BaseService<Workspace> {
       throw new NotFoundException(`Workspace with ID ${id} not found`);
     }
 
-    // TODO: Check if user is member or owner
-    // For now, just check if user is owner
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('You do not have access to this workspace');
-    }
+    // Access control handled by PermissionsGuard
 
     return workspace;
   }
@@ -111,10 +107,7 @@ export class WorkspacesService extends BaseService<Workspace> {
   ): Promise<Workspace> {
     const workspace = await this.findOne(id, userId);
 
-    // Only owner can update
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can update');
-    }
+    // Only owner can update - Moved to PermissionsGuard
 
     Object.assign(workspace, updateWorkspaceDto);
     return this.workspaceRepository.save(workspace);
@@ -123,10 +116,7 @@ export class WorkspacesService extends BaseService<Workspace> {
   async remove(id: string, userId: string): Promise<void> {
     const workspace = await this.findOne(id, userId);
 
-    // Only owner can delete
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can delete');
-    }
+    // Only owner can delete - Moved to PermissionsGuard
 
     await this.workspaceRepository.remove(workspace);
   }

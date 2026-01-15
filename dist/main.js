@@ -58,6 +58,12 @@ async function bootstrap() {
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
+        exceptionFactory: (errors) => {
+            const messages = errors.map((error) => {
+                return `${error.property}: ${Object.values(error.constraints || {}).join(', ')}`;
+            });
+            return new common_1.BadRequestException(messages);
+        },
     }));
     app.useGlobalFilters(new http_exception_filter_1.AllExceptionsFilter());
     app.useGlobalInterceptors(new request_context_interceptor_1.RequestContextInterceptor());

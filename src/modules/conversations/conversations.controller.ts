@@ -9,6 +9,9 @@ import {
   UseGuards,
   Query,
 } from '@nestjs/common';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 import {
   ApiTags,
   ApiOperation,
@@ -34,7 +37,7 @@ import {
 
 @ApiTags('conversations')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('conversations')
 export class ConversationsController {
   constructor(private readonly conversationsService: ConversationsService) {}
@@ -46,6 +49,7 @@ export class ConversationsController {
     description: 'Conversation created successfully',
     type: ConversationResponseDto,
   })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_CHAT)
   create(
     @User('sub') userId: string,
     @Body() createConversationDto: CreateConversationDto,
@@ -137,6 +141,7 @@ export class ConversationsController {
       ],
     },
   })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_CHAT)
   findAllByWorkspace(
     @Param('workspaceId') workspaceId: string,
     @User('sub') userId: string,

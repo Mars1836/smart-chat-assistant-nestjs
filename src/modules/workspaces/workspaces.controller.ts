@@ -31,10 +31,13 @@ import {
   PaginatedResponseDto,
   PaginationMetaDto,
 } from '../../common/dto';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 
 @ApiTags('workspaces')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces')
 export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
@@ -104,7 +107,7 @@ export class WorkspacesController {
     return this.workspacesService.findAll(userId, pagination);
   }
 
-  @Get(':id')
+  @Get(':workspaceId')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết workspace' })
   @ApiResponse({
     status: 200,
@@ -113,11 +116,12 @@ export class WorkspacesController {
   })
   @ApiResponse({ status: 404, description: 'Workspace not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
-  findOne(@Param('id') id: string, @User('sub') userId: string) {
+  @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_VIEW_SETTINGS)
+  findOne(@Param('workspaceId') id: string, @User('sub') userId: string) {
     return this.workspacesService.findOne(id, userId);
   }
 
-  @Patch(':id')
+  @Patch(':workspaceId')
   @ApiOperation({ summary: 'Cập nhật workspace' })
   @ApiResponse({
     status: 200,
@@ -125,27 +129,30 @@ export class WorkspacesController {
     type: WorkspaceResponseDto,
   })
   @ApiResponse({ status: 403, description: 'Only owner can update' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_UPDATE)
   update(
-    @Param('id') id: string,
+    @Param('workspaceId') id: string,
     @User('sub') userId: string,
     @Body() updateWorkspaceDto: UpdateWorkspaceDto,
   ) {
     return this.workspacesService.update(id, userId, updateWorkspaceDto);
   }
 
-  @Delete(':id')
+  @Delete(':workspaceId')
   @ApiOperation({ summary: 'Xóa workspace' })
   @ApiResponse({ status: 200, description: 'Workspace deleted successfully' })
   @ApiResponse({ status: 403, description: 'Only owner can delete' })
-  remove(@Param('id') id: string, @User('sub') userId: string) {
+  @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_DELETE)
+  remove(@Param('workspaceId') id: string, @User('sub') userId: string) {
     return this.workspacesService.remove(id, userId);
   }
 
-  @Get(':id/chatbot')
+  @Get(':workspaceId/chatbot')
   @ApiOperation({ summary: 'Lấy thông tin chatbot của workspace' })
   @ApiResponse({ status: 200, description: 'Chatbot details' })
   @ApiResponse({ status: 404, description: 'Chatbot not found' })
-  getChatbot(@Param('id') id: string, @User('sub') userId: string) {
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
+  getChatbot(@Param('workspaceId') id: string, @User('sub') userId: string) {
     return this.workspacesService.getChatbot(id, userId);
   }
 }

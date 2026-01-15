@@ -43,18 +43,7 @@ export class ConversationsService extends BaseService<Conversation> {
     const workspaceId = createConversationDto.workspace_id;
 
     // Check member access (read access to workspace)
-    // Any active member can start a conversation
-    const canAccess = await this.permissionsService.checkPermission(
-      workspaceId,
-      userId,
-      WORKSPACE_PERMISSIONS.CHATBOT_CHAT, // Need chat permission to start conversation
-    );
-
-    if (!canAccess) {
-      throw new ForbiddenException(
-        'You do not have permission to chat in this workspace',
-      );
-    }
+    // Permission handled by Guard
 
     // Kiểm tra chatbot tồn tại và thuộc workspace
     const chatbot = await this.chatbotRepository.findOne({
@@ -101,17 +90,7 @@ export class ConversationsService extends BaseService<Conversation> {
 
     // If not admin/owner, restrict to own conversations
     if (!canViewAll) {
-      // Check basic access first
-      const hasAccess = await this.permissionsService.checkPermission(
-        workspaceId,
-        userId,
-        WORKSPACE_PERMISSIONS.CHATBOT_CHAT, // Basic member access
-      );
-      if (!hasAccess) {
-        throw new ForbiddenException(
-          'You do not have access to this workspace conversations',
-        );
-      }
+      // Basic access handled by Guard
       where.user_id = userId;
     }
 

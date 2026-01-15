@@ -17,6 +17,7 @@ import {
   AuthResponseDto,
   RefreshResponseDto,
   ProfileResponseDto,
+  ChangePasswordDto,
 } from './dto';
 
 @ApiTags('auth')
@@ -104,5 +105,30 @@ export class AuthController {
       throw new Error('User not found in request');
     }
     return this.authService.profile(user.sub);
+  }
+
+  @Post('change-password')
+  @ApiOperation({
+    summary: 'Đổi mật khẩu',
+    description: 'Đổi mật khẩu cho tài khoản bằng email',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+  })
+  @ApiBadRequestResponse({
+    description: 'Validation error or invalid data',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'User not found',
+  })
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.authService.changePassword(
+      changePasswordDto.email,
+      changePasswordDto.newPassword,
+    );
+    return { message: 'Password changed successfully' };
   }
 }

@@ -47,9 +47,7 @@ export class DocumentsService extends BaseService<Document> {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can upload documents');
-    }
+    // Permission check handled by PermissionsGuard
 
     // Tạo thư mục uploads nếu chưa có
     const uploadsDir = path.join(process.cwd(), 'uploads', 'documents', workspaceId);
@@ -98,9 +96,7 @@ export class DocumentsService extends BaseService<Document> {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (workspace.owner_id !== userId) {
-      throw new ForbiddenException('You do not have access to this workspace');
-    }
+    // Permission check handled by PermissionsGuard
 
     // Set default sort if not provided
     if (!pagination.sortBy) {
@@ -131,10 +127,7 @@ export class DocumentsService extends BaseService<Document> {
       throw new NotFoundException('Document not found');
     }
 
-    // Kiểm tra quyền truy cập
-    if (document.workspace.owner_id !== userId && document.user_id !== userId) {
-      throw new ForbiddenException('You do not have access to this document');
-    }
+    // Permission check handled by PermissionsGuard
 
     return document;
   }
@@ -150,10 +143,7 @@ export class DocumentsService extends BaseService<Document> {
   ): Promise<Document> {
     const document = await this.findOne(workspaceId, documentId, userId);
 
-    // Chỉ owner workspace hoặc người upload mới được cập nhật
-    if (document.workspace.owner_id !== userId && document.user_id !== userId) {
-      throw new ForbiddenException('You cannot update this document');
-    }
+    // Permission check handled by PermissionsGuard
 
     if (updateDto.file_name) {
       document.file_name = updateDto.file_name;
@@ -172,10 +162,7 @@ export class DocumentsService extends BaseService<Document> {
   ): Promise<void> {
     const document = await this.findOne(workspaceId, documentId, userId);
 
-    // Chỉ owner workspace mới được xóa
-    if (document.workspace.owner_id !== userId) {
-      throw new ForbiddenException('Only workspace owner can delete documents');
-    }
+    // Permission check handled by PermissionsGuard
 
     // Xóa file từ disk
     const filePath = path.join(process.cwd(), document.file_url);

@@ -3,10 +3,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   Column,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
-import { User } from '../../modules/users/entities/user.entity';
 
 export abstract class BaseEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -21,8 +18,6 @@ export abstract class BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   created_by_id: string | null;
 
-  // Relations
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'created_by_id' })
-  created_by: User | null;
+  // Note: 'created_by' relation removed to avoid circular dependency with User entity.
+  // Use created_by_id to fetch user if needed, or handle in service layer.
 }

@@ -25,8 +25,10 @@ const workspace_members_module_1 = require("./modules/workspace-members/workspac
 const auth_module_1 = require("./modules/auth/auth.module");
 const system_roles_module_1 = require("./modules/system-roles/system-roles.module");
 const workspace_roles_module_1 = require("./modules/workspace-roles/workspace-roles.module");
-const workspace_permissions_module_1 = require("./modules/workspace-permissions/workspace-permissions.module");
 const workspace_member_permissions_module_1 = require("./modules/workspace-member-permissions/workspace-member-permissions.module");
+const workspace_role_permissions_module_1 = require("./modules/workspace-role-permissions/workspace-role-permissions.module");
+const workspace_permissions_module_1 = require("./modules/workspace-permissions/workspace-permissions.module");
+const rbac_seed_module_1 = require("./modules/rbac-seed/rbac-seed.module");
 const chatbots_module_1 = require("./modules/chatbots/chatbots.module");
 const custom_intents_module_1 = require("./modules/custom-intents/custom-intents.module");
 const custom_responses_module_1 = require("./modules/custom-responses/custom-responses.module");
@@ -58,7 +60,9 @@ exports.AppModule = AppModule = __decorate([
             system_roles_module_1.SystemRolesModule,
             workspace_roles_module_1.WorkspaceRolesModule,
             workspace_permissions_module_1.WorkspacePermissionsModule,
+            workspace_role_permissions_module_1.WorkspaceRolePermissionsModule,
             workspace_member_permissions_module_1.WorkspaceMemberPermissionsModule,
+            rbac_seed_module_1.RbacSeedModule,
             users_module_1.UsersModule,
             workspaces_module_1.WorkspacesModule,
             workspace_members_module_1.WorkspaceMembersModule,

@@ -7,7 +7,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { WorkspacePermissionsService } from '../../modules/workspace-permissions/workspace-permissions.service';
-import { User } from '../../modules/users/entities/user.entity';
+
+
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -27,8 +28,12 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user: User = request.user;
-    const workspaceId = request.params.workspaceId || request.query.workspaceId;
+    const user = request.user; // User from JWT strategy (payload), not Entity
+    const workspaceId =
+      request.params.workspaceId ||
+      request.query.workspaceId ||
+      request.body.workspace_id ||
+      request.body.workspaceId;
 
     if (!user || !workspaceId) {
       throw new ForbiddenException(
@@ -36,12 +41,10 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    // Check each permission (OR logic? or AND logic? Usually AND for strict security, but let's check one by one)
-    // Here implementing AND logic: User must have ALL required permissions
     for (const permission of requiredPermissions) {
       const hasPermission = await this.permissionsService.checkPermission(
         workspaceId,
-        user.sub, // Assuming request.user has sub (userId)
+        user.sub,
         permission,
       );
 

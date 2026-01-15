@@ -27,6 +27,15 @@ export class WorkspacePermissionsService {
     userId: string,
     permissionName: string,
   ): Promise<boolean> {
+    // 0. Check if user is Workspace Owner -> Full Access
+    const workspace = await this.memberRepo.manager
+      .getRepository('Workspace')
+      .findOne({ where: { id: workspaceId } });
+
+    if (workspace && (workspace as any).owner_id === userId) {
+      return true;
+    }
+
     // 1. Get member details with role
     const member = await this.memberRepo.findOne({
       where: { workspace_id: workspaceId, user_id: userId, is_active: true },
@@ -69,5 +78,67 @@ export class WorkspacePermissionsService {
     }
 
     return hasAccess;
+  }
+
+  /**
+   * Get all available permissions
+   */
+  async getAllPermissions(): Promise<WorkspacePermission[]> {
+    return await this.permissionRepo.find({
+      order: { category: 'ASC', action: 'ASC' },
+    });
+  }
+
+  /**
+   * Get user's permissions in a workspace
+   */
+  async getUserPermissions(
+    workspaceId: string,
+    userId: string,
+  ): Promise<string[]> {
+    // Check if user is owner
+    const workspace = await this.memberRepo.manager
+      .getRepository('Workspace')
+      .findOne({ where: { id: workspaceId } });
+
+    if (workspace && (workspace as any).owner_id === userId) {
+      // Owner has all permissions
+      const allPermissions = await this.getAllPermissions();
+      return allPermissions.map((p) => p.name);
+    }
+
+    // Get member with role
+    const member = await this.memberRepo.findOne({
+      where: { workspace_id: workspaceId, user_id: userId, is_active: true },
+      relations: ['workspaceRole'],
+    });
+
+    if (!member) return [];
+
+    // Get role permissions
+    const rolePermissions = await this.rolePermissionRepo.find({
+      where: { workspace_role_id: member.workspaceRole.id },
+      relations: ['permission'],
+    });
+
+    const permissionNames = new Set(
+      rolePermissions.map((rp) => rp.permission.name),
+    );
+
+    // Apply custom member permissions (overrides)
+    const customPermissions = await this.memberPermissionRepo.find({
+      where: { workspace_member_id: member.id },
+      relations: ['permission'],
+    });
+
+    for (const custom of customPermissions) {
+      if (custom.grant_type === 'grant') {
+        permissionNames.add(custom.permission.name);
+      } else if (custom.grant_type === 'revoke') {
+        permissionNames.delete(custom.permission.name);
+      }
+    }
+
+    return Array.from(permissionNames);
   }
 }
