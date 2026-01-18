@@ -27,4 +27,16 @@ export class WorkspaceResponseDto {
 
   @ApiProperty()
   updated_at: Date;
+
+  @ApiPropertyOptional({ 
+    example: true,
+    description: 'True if current user is the owner of this workspace'
+  })
+  is_owner?: boolean;
+
+  @ApiPropertyOptional({ 
+    example: 'Owner',
+    description: 'Role of current user in this workspace (Owner, Admin, Editor, Viewer)'
+  })
+  user_role?: string;
 }

@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,7 +14,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { WorkspaceMembersService } from './workspace-members.service';
-import { InviteMemberDto } from './dto';
+import { InviteMemberDto, UpdateMemberRoleDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -112,6 +113,44 @@ export class WorkspaceMembersController {
       workspaceId,
       inviterId,
       inviteDto,
+    );
+  }
+  @Patch(':memberId')
+  @ApiOperation({
+    summary: 'Cập nhật vai trò thành viên',
+    description: `Thay đổi role của thành viên.
+    
+**Roles có sẵn:**
+- **Admin**: Tất cả quyền trừ xóa workspace. (Không được edit Admin khác).
+- **Editor**: Quản lý chatbot, documents, nhưng không quản lý member.
+- **Viewer**: Chỉ có quyền xem và chat.
+
+⚠️ **Lưu ý**: Không thể update role Owner.`,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Member role updated successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Cannot change to/from Owner role',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Member or Role not found',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.MEMBER_UPDATE_ROLE)
+  async updateMemberRole(
+    @Param('workspaceId') workspaceId: string,
+    @Param('memberId') memberId: string,
+    @User('sub') requesterId: string,
+    @Body() updateDto: UpdateMemberRoleDto,
+  ) {
+    return await this.workspaceMembersService.updateRole(
+      workspaceId,
+      memberId,
+      requesterId,
+      updateDto.role_name,
     );
   }
 }

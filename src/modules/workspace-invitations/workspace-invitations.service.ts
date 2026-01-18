@@ -96,8 +96,13 @@ export class WorkspaceInvitationsService {
       existingInvitation.workspace_role_id = role.id;
       const updated = await this.invitationRepo.save(existingInvitation);
 
-      // Send email (stub)
-      this.sendInvitationEmail(inviteDto.email, workspace.name, token);
+      // Get inviter info
+      const inviter = await this.userRepo.findOne({ where: { id: inviterId } });
+      const inviterName = inviter?.name ?? 'Someone';
+      const inviterEmail = inviter?.email ?? '';
+
+      // Send email
+      this.sendInvitationEmail(inviteDto.email, workspace.name, token, inviterName, inviterEmail);
 
       return updated;
     }
@@ -115,8 +120,13 @@ export class WorkspaceInvitationsService {
 
     const saved = await this.invitationRepo.save(invitation);
 
-    // Send email (stub)
-    this.sendInvitationEmail(inviteDto.email, workspace.name, token);
+    // Get inviter info
+    const inviter = await this.userRepo.findOne({ where: { id: inviterId } });
+    const inviterName = inviter?.name ?? 'Someone';
+    const inviterEmail = inviter?.email ?? '';
+
+    // Send email
+    this.sendInvitationEmail(inviteDto.email, workspace.name, token, inviterName, inviterEmail);
 
     return saved;
   }
@@ -218,8 +228,10 @@ export class WorkspaceInvitationsService {
     email: string,
     workspaceName: string,
     token: string,
+    inviterName: string,
+    inviterEmail: string,
   ): Promise<void> {
-    const acceptLink = `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/accept-invite?token=${token}`;
+    const acceptLink = `${process.env.FE_DOMAIN ?? 'http://localhost:3000'}/accept-invite?token=${token}`;
 
     try {
       // Read email template
@@ -234,7 +246,9 @@ export class WorkspaceInvitationsService {
       // Replace placeholders
       htmlTemplate = htmlTemplate
         .replace(/{{workspaceName}}/g, workspaceName)
-        .replace(/{{acceptLink}}/g, acceptLink);
+        .replace(/{{acceptLink}}/g, acceptLink)
+        .replace(/{{inviterName}}/g, inviterName)
+        .replace(/{{inviterEmail}}/g, inviterEmail);
 
       await this.mailerService.sendMail({
         to: email,
@@ -247,5 +261,157 @@ export class WorkspaceInvitationsService {
       console.error('Failed to send invitation email:', error);
       // Don't throw error - invitation still created, just email failed
     }
+  }
+
+  /**
+   * Resend invitation email (simplified - no workspaceId needed in params)
+   */
+  async resendInvitationSimple(
+    invitationId: string,
+    userId: string,
+  ): Promise<void> {
+    // First get invitation to know which workspace it belongs to
+    const invitation = await this.invitationRepo.findOne({
+      where: { id: invitationId },
+      relations: ['workspace'],
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    // Check if user has permission in this workspace
+    // User must be a member with invite permission or owner
+    const workspace = await this.workspaceRepo.findOne({
+      where: { id: invitation.workspace_id },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    // Check if user is owner
+    const isOwner = workspace.owner_id === userId;
+
+    if (!isOwner) {
+      // Check if user is member with invite permission
+      const member = await this.memberRepo.findOne({
+        where: {
+          workspace_id: invitation.workspace_id,
+          user_id: userId,
+          is_active: true,
+        },
+      });
+
+      if (!member) {
+        throw new BadRequestException(
+          'You do not have permission to resend invitations in this workspace',
+        );
+      }
+    }
+
+    if (invitation.status !== 'pending') {
+      throw new BadRequestException('Can only resend pending invitations');
+    }
+
+    // Check if expired
+    if (new Date() > new Date(invitation.expires_at)) {
+      throw new GoneException('Invitation has expired');
+    }
+
+    // Generate new token and extend expiration
+    const token = uuidv4();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    invitation.token = token;
+    invitation.expires_at = expiresAt;
+    await this.invitationRepo.save(invitation);
+
+    // Get inviter info
+    const inviter = await this.userRepo.findOne({ where: { id: invitation.invited_by } });
+    const inviterName = inviter?.name ?? 'Someone';
+    const inviterEmail = inviter?.email ?? '';
+
+    // Send email
+    await this.sendInvitationEmail(
+      invitation.email,
+      invitation.workspace.name,
+      token,
+      inviterName,
+      inviterEmail,
+    );
+  }
+
+  /**
+   * Resend invitation email
+   */
+  async resendInvitation(
+    invitationId: string,
+    workspaceId: string,
+  ): Promise<void> {
+    const invitation = await this.invitationRepo.findOne({
+      where: { id: invitationId, workspace_id: workspaceId },
+      relations: ['workspace'],
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    if (invitation.status !== 'pending') {
+      throw new BadRequestException('Can only resend pending invitations');
+    }
+
+    // Check if expired
+    if (new Date() > new Date(invitation.expires_at)) {
+      throw new GoneException('Invitation has expired');
+    }
+
+    // Generate new token and extend expiration
+    const token = uuidv4();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
+    invitation.token = token;
+    invitation.expires_at = expiresAt;
+    await this.invitationRepo.save(invitation);
+
+    // Get inviter info
+    const inviter = await this.userRepo.findOne({ where: { id: invitation.invited_by } });
+    const inviterName = inviter?.name ?? 'Someone';
+    const inviterEmail = inviter?.email ?? '';
+
+    // Send email
+    await this.sendInvitationEmail(
+      invitation.email,
+      invitation.workspace.name,
+      token,
+      inviterName,
+      inviterEmail,
+    );
+  }
+
+  /**
+   * Cancel pending invitation
+   */
+  async cancelInvitation(
+    invitationId: string,
+    workspaceId: string,
+  ): Promise<void> {
+    const invitation = await this.invitationRepo.findOne({
+      where: { id: invitationId, workspace_id: workspaceId },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    if (invitation.status !== 'pending') {
+      throw new BadRequestException('Can only cancel pending invitations');
+    }
+
+    // Delete the invitation
+    await this.invitationRepo.remove(invitation);
   }
 }

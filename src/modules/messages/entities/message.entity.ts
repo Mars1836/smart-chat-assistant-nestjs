@@ -6,7 +6,7 @@ import { Intent } from '../../intents/entities/intent.entity';
 
 @Entity({ name: 'messages' })
 export class Message extends BaseEntity {
-  @ManyToOne(() => Conversation, { nullable: false })
+  @ManyToOne(() => Conversation, { nullable: false, onDelete: 'CASCADE' })
   conversation: Conversation;
 
   @Column({ type: 'varchar', length: 10 })

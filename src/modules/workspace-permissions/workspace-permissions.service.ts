@@ -141,4 +141,73 @@ export class WorkspacePermissionsService {
 
     return Array.from(permissionNames);
   }
+
+  /**
+   * Get detailed permission status for user (source & status)
+   */
+  async getDetailedUserPermissions(workspaceId: string, userId: string) {
+    // 0. Get all system permissions
+    const allSystemPermissions = await this.getAllPermissions();
+    
+    // 1. Get member details
+    const member = await this.memberRepo.findOne({
+      where: { workspace_id: workspaceId, user_id: userId, is_active: true },
+      relations: ['workspaceRole'],
+    });
+
+    if (!member) return [];
+
+    // 2. Get role permissions
+    const rolePermissions = await this.rolePermissionRepo.find({
+      where: { workspace_role_id: member.workspaceRole.id },
+      relations: ['permission'],
+    });
+    const rolePermissionSet = new Set(rolePermissions.map((rp) => rp.permission.name));
+
+    // 3. Get custom permissions
+    const customPermissions = await this.memberPermissionRepo.find({
+      where: { workspace_member_id: member.id },
+      relations: ['permission'],
+    });
+    const customMap = new Map<string, 'grant' | 'revoke'>();
+    customPermissions.forEach(cp => {
+      customMap.set(cp.permission.name, cp.grant_type);
+    });
+
+    // 4. Build detailed result
+    return allSystemPermissions.map(p => {
+      const fromRole = rolePermissionSet.has(p.name);
+      const customGrant = customMap.get(p.name);
+      
+      let effectiveAuth = false;
+      let source = 'NONE'; // ROLE, CUSTOM, NONE
+      let details = '';
+
+      if (customGrant) {
+         source = 'CUSTOM';
+         effectiveAuth = (customGrant === 'grant');
+         details = customGrant === 'grant' ? 'Granted explicitly' : 'Revoked explicitly';
+      } else {
+         if (fromRole) {
+            source = 'ROLE';
+            effectiveAuth = true;
+            details = `Inherited from ${member.workspaceRole.name}`;
+         }
+      }
+
+      // Handle Owner case explicitly?
+      // If Owner, everything is GRANTED by ROLE (technically Owner logic bypasses this, but for UI we show Logic)
+      // Standard logic above applies. Owner usually has ALL roles in seed, but let's stick to calculated.
+
+      return {
+        permission_name: p.name,
+        category: p.category,
+        action: p.action,
+        description: p.description,
+        is_allowed: effectiveAuth,
+        source: source, // ROLE, CUSTOM, NONE
+        custom_grant_type: customGrant || null, // null, 'grant', 'revoke'
+      };
+    });
+  }
 }

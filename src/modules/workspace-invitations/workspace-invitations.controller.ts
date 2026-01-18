@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -109,5 +110,80 @@ export class WorkspaceInvitationsController {
       },
       role: result.role.name,
     };
+  }
+
+  @Post(':invitationId/resend')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Gửi lại email mời (endpoint đơn giản)',
+    description: 'Tạo token mới và gửi lại email. Không cần workspaceId trong URL.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation resent successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invitation not found',
+  })
+  async resendInvitationSimple(
+    @Param('invitationId') invitationId: string,
+    @User('sub') userId: string,
+  ) {
+    await this.invitationsService.resendInvitationSimple(invitationId, userId);
+    return { message: 'Invitation resent successfully' };
+  }
+
+  @Post('workspaces/:workspaceId/:invitationId/resend')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Gửi lại email mời',
+    description: 'Tạo token mới và gửi lại email cho lời mời đang pending',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation resent successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invitation not found',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'Invitation has expired',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.MEMBER_INVITE)
+  async resendInvitation(
+    @Param('workspaceId') workspaceId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    await this.invitationsService.resendInvitation(invitationId, workspaceId);
+    return { message: 'Invitation resent successfully' };
+  }
+
+  @Delete('workspaces/:workspaceId/:invitationId')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Hủy lời mời',
+    description: 'Xóa lời mời đang pending',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation cancelled successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invitation not found',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.MEMBER_INVITE)
+  async cancelInvitation(
+    @Param('workspaceId') workspaceId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    await this.invitationsService.cancelInvitation(invitationId, workspaceId);
+    return { message: 'Invitation cancelled successfully' };
   }
 }

@@ -99,12 +99,12 @@ export class AuthController {
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - Invalid or missing JWT token',
   })
-  profile(@Req() req: Request): ProfileResponseDto {
+  async profile(@Req() req: Request): Promise<ProfileResponseDto> {
     const user = req['user'] as { sub: string; email: string } | undefined;
     if (!user) {
       throw new Error('User not found in request');
     }
-    return this.authService.profile(user.sub);
+    return await this.authService.profile(user.sub);
   }
 
   @Post('change-password')

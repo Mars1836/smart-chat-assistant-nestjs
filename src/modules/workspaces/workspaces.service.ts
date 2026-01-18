@@ -2,15 +2,19 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Workspace } from './entities/workspace.entity';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
+import { WorkspaceMember } from '../workspace-members/entities/workspace-member.entity';
+import { WorkspaceRole } from '../workspace-roles/entities/workspace-role.entity';
 import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
+import { WORKSPACE_ROLES } from '../../common/constants/permissions.constant';
 
 @Injectable()
 export class WorkspacesService extends BaseService<Workspace> {
@@ -19,6 +23,11 @@ export class WorkspacesService extends BaseService<Workspace> {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
+    @InjectRepository(WorkspaceMember)
+    private readonly memberRepository: Repository<WorkspaceMember>,
+    @InjectRepository(WorkspaceRole)
+    private readonly roleRepository: Repository<WorkspaceRole>,
+    private readonly dataSource: DataSource,
   ) {
     super();
   }
@@ -31,50 +40,124 @@ export class WorkspacesService extends BaseService<Workspace> {
     userId: string,
     createWorkspaceDto: CreateWorkspaceDto,
   ): Promise<Workspace> {
-    // Create workspace
-    // created_by_id sẽ được tự động thêm bởi BaseEntitySubscriber
-    const workspace = this.workspaceRepository.create({
-      ...createWorkspaceDto,
-      owner_id: userId,
-    });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const savedWorkspace = await this.workspaceRepository.save(workspace);
+    try {
+      // 1. Create workspace
+      const workspace = this.workspaceRepository.create({
+        ...createWorkspaceDto,
+        owner_id: userId,
+      });
+      const savedWorkspace = await queryRunner.manager.save(workspace);
 
-    // Auto-create chatbot for this workspace
-    // created_by_id sẽ được tự động thêm bởi BaseEntitySubscriber
-    const chatbot = this.chatbotRepository.create({
-      workspace_id: savedWorkspace.id,
-      name: `${savedWorkspace.name} Bot`,
-      language: 'vi',
-      greeting_message: `Xin chào! Tôi là chatbot của ${savedWorkspace.name}. Tôi có thể giúp gì cho bạn?`,
-      fallback_message:
-        'Xin lỗi, tôi chưa hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn được không?',
-    });
+      // 2. Auto-create chatbot
+      const chatbot = this.chatbotRepository.create({
+        workspace_id: savedWorkspace.id,
+        name: `${savedWorkspace.name} Bot`,
+        language: 'vi',
+        greeting_message: `Xin chào! Tôi là chatbot của ${savedWorkspace.name}. Tôi có thể giúp gì cho bạn?`,
+        fallback_message:
+          'Xin lỗi, tôi chưa hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn được không?',
+      });
+      await queryRunner.manager.save(chatbot);
 
-    await this.chatbotRepository.save(chatbot);
+      // 3. Add owner as member
+      const ownerRole = await this.roleRepository.findOne({
+        where: { name: WORKSPACE_ROLES.OWNER },
+      });
 
-    return savedWorkspace;
+      if (!ownerRole) {
+        throw new InternalServerErrorException('Owner role not found in system');
+      }
+
+      const ownerMember = this.memberRepository.create({
+        workspace_id: savedWorkspace.id,
+        user_id: userId,
+        workspace_role_id: ownerRole.id,
+        is_active: true,
+      });
+      await queryRunner.manager.save(ownerMember);
+
+      await queryRunner.commitTransaction();
+      return savedWorkspace;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
    * Lấy danh sách workspaces của user (có phân trang)
-   * Note: Không dùng findAll() từ base class vì cần userId parameter
+   * Bao gồm: workspaces mà user là owner HOẶC là member
    */
   async findAllByUser(
     userId: string,
     pagination: PaginationDto,
   ): Promise<PaginatedResult<Workspace>> {
-    // TODO: Also include workspaces where user is a member
-    // For now, just return workspaces owned by user
     // Set default sort if not provided
     if (!pagination.sortBy) {
       pagination.sortBy = 'created_at';
       pagination.sortOrder = 'DESC';
     }
 
-    return this.paginate(pagination, {
-      where: { owner_id: userId },
+    const { page = 1, limit = 10, sortBy, sortOrder = 'DESC' } = pagination;
+    const skip = (page - 1) * limit;
+
+    // Query builder to get workspaces where user is owner OR member
+    const queryBuilder = this.workspaceRepository
+      .createQueryBuilder('workspace')
+      .leftJoin('workspace_members', 'member', 'member.workspace_id = workspace.id AND member.user_id = :userId AND member.is_active = true', { userId })
+      .leftJoin('workspace_roles', 'role', 'role.id = member.workspace_role_id')
+      .select([
+        'workspace',
+        'member.id',
+        'member.workspace_role_id', 
+        'role.name'
+      ])
+      .where('workspace.owner_id = :userId', { userId })
+      .orWhere('member.user_id = :userId', { userId })
+      .distinct(true)
+      .orderBy(`workspace.${sortBy}`, sortOrder as 'ASC' | 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [workspaces, total] = await queryBuilder.getManyAndCount();
+
+    // Map workspaces to include is_owner and user_role
+    const data = workspaces.map((workspace: any) => {
+      const isOwner = workspace.owner_id === userId;
+      let userRole = isOwner ? 'Owner' : null;
+
+      // If not owner, get role from member relationship
+      if (!isOwner && workspace.members && workspace.members[0]) {
+        userRole = workspace.members[0].workspaceRole?.name || 'Member';
+      }
+
+      return {
+        ...workspace,
+        is_owner: isOwner,
+        user_role: userRole,
+        members: undefined, // Remove members from response
+      };
     });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 
   // Alias để giữ backward compatibility

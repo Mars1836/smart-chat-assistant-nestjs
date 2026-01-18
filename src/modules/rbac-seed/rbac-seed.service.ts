@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { WorkspaceRole } from '../workspace-roles/entities/workspace-role.entity';
 import { WorkspacePermission } from '../workspace-permissions/entities/workspace-permission.entity';
 import { WorkspaceRolePermission } from '../workspace-role-permissions/entities/workspace-role-permission.entity';
+import { Workspace } from '../workspaces/entities/workspace.entity';
+import { WorkspaceMember } from '../workspace-members/entities/workspace-member.entity';
 import {
   WORKSPACE_PERMISSIONS,
   WORKSPACE_ROLES,
@@ -20,6 +22,10 @@ export class RbacSeedService implements OnModuleInit {
     private readonly permissionRepo: Repository<WorkspacePermission>,
     @InjectRepository(WorkspaceRolePermission)
     private readonly rolePermissionRepo: Repository<WorkspaceRolePermission>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepo: Repository<Workspace>,
+    @InjectRepository(WorkspaceMember)
+    private readonly memberRepo: Repository<WorkspaceMember>,
   ) {}
 
   async onModuleInit() {
@@ -27,7 +33,44 @@ export class RbacSeedService implements OnModuleInit {
     await this.seedPermissions();
     await this.seedRoles();
     await this.seedRolePermissions();
+    // await this.syncWorkspaceOwners();
     this.logger.log('RBAC seeding completed.');
+  }
+
+  private async syncWorkspaceOwners() {
+    this.logger.log('Syncing workspace owners to members table...');
+    const workspaces = await this.workspaceRepo.find();
+    const ownerRole = await this.roleRepo.findOne({
+      where: { name: WORKSPACE_ROLES.OWNER },
+    });
+
+    if (!ownerRole) {
+      this.logger.error('Owner role not found, skipping sync.');
+      return;
+    }
+
+    let syncedCount = 0;
+    for (const workspace of workspaces) {
+      const exists = await this.memberRepo.findOne({
+        where: {
+          workspace_id: workspace.id,
+          user_id: workspace.owner_id,
+        },
+      });
+
+      if (!exists) {
+        await this.memberRepo.save(
+          this.memberRepo.create({
+            workspace_id: workspace.id,
+            user_id: workspace.owner_id,
+            workspace_role_id: ownerRole.id,
+            is_active: true,
+          }),
+        );
+        syncedCount++;
+      }
+    }
+    this.logger.log(`Synced ${syncedCount} missing workspace owners.`);
   }
 
   private async seedPermissions() {
@@ -107,12 +150,14 @@ export class RbacSeedService implements OnModuleInit {
       WORKSPACE_PERMISSIONS.DOCUMENT_UPDATE,
       WORKSPACE_PERMISSIONS.DOCUMENT_DELETE,
       WORKSPACE_PERMISSIONS.DOCUMENT_VIEW,
+      WORKSPACE_PERMISSIONS.MEMBER_VIEW,
     ];
 
     const viewerPermissions = [
       WORKSPACE_PERMISSIONS.CHATBOT_VIEW,
       WORKSPACE_PERMISSIONS.CHATBOT_CHAT,
       WORKSPACE_PERMISSIONS.DOCUMENT_VIEW,
+      WORKSPACE_PERMISSIONS.MEMBER_VIEW,
     ];
 
     // 3. Map roles to permissions

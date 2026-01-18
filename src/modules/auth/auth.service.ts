@@ -74,9 +74,12 @@ export class AuthService {
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     // Find user by email
-    const user = await this.userRepository.findOne({
-      where: { email: loginDto.email },
-    });
+    // Find user by email
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email: loginDto.email })
+      .getOne();
 
     if (!user || !user.password) {
       throw new UnauthorizedException('Invalid credentials');
@@ -126,9 +129,21 @@ export class AuthService {
     }
   }
 
-  profile(userId: string): ProfileResponseDto {
-    // TODO: Replace with real user lookup from database
-    return { id: userId, email: 'user@example.com', name: 'User' };
+  async profile(userId: string): Promise<ProfileResponseDto> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'name', 'email', 'avatar_url', 'language'],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    };
   }
 
   async changePassword(
