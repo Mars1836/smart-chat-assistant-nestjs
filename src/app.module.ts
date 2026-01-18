@@ -13,6 +13,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { EventsModule } from './events/events.module';
 import { PaymentsModule } from './payments/payments.module';
 import { GroupMembersModule } from './group-members/group-members.module';
+import { RagModule } from './rag/rag.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { GroupMembersModule } from './group-members/group-members.module';
     EventsModule,
     PaymentsModule,
     GroupMembersModule,
+    RagModule,
   ],
   controllers: [AppController],
   providers: [AppService],
