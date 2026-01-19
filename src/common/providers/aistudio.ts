@@ -228,6 +228,46 @@ export class AIStudioService {
   }
 
   /**
+   * Generate embedding for text
+   */
+  async generateEmbedding(text: string, model = 'text-embedding-004'): Promise<number[]> {
+    try {
+      const requestBody = {
+        content: {
+          parts: [{ text }],
+        },
+      };
+
+      const response = await fetch(
+        `${this.baseUrl}/models/${model}:embedContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Gemini Embedding API error: ${response.status} - ${error}`);
+      }
+
+      const data = (await response.json()) as { embedding: { values: number[] } };
+
+      if (!data.embedding || !data.embedding.values) {
+        throw new Error('No embedding returned from Gemini API');
+      }
+
+      return data.embedding.values;
+    } catch (error) {
+      this.logger.error('Error generating embedding:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Test connection
    */
   async testConnection(): Promise<boolean> {

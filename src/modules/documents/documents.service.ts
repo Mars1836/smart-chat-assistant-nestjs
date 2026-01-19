@@ -13,6 +13,7 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import { RagService } from '../rag/rag.service';
 
 @Injectable()
 export class DocumentsService extends BaseService<Document> {
@@ -21,6 +22,7 @@ export class DocumentsService extends BaseService<Document> {
     private readonly documentRepo: Repository<Document>,
     @InjectRepository(Workspace)
     private readonly workspaceRepo: Repository<Workspace>,
+    private readonly ragService: RagService,
   ) {
     super();
   }
@@ -74,9 +76,16 @@ export class DocumentsService extends BaseService<Document> {
       file_url: `/uploads/documents/${workspaceId}/${uniqueName}`,
       type: fileType,
       size: file.size,
+      status: 'pending', // Initial status
     });
 
-    return await this.documentRepo.save(document);
+    const savedDoc = await this.documentRepo.save(document);
+
+    // Trigger RAG Indexing (Async)
+    // Pass the actual mimetype, not the file extension
+    await this.ragService.indexDocument(savedDoc.id, `/uploads/documents/${workspaceId}/${uniqueName}`, file.mimetype, userId);
+
+    return savedDoc;
   }
 
   /**

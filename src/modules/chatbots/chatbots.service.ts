@@ -12,6 +12,7 @@ import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
 import { CreateChatbotDto, UpdateChatbotDto, ChatDto } from './dto';
 import { AIStudioService } from '../../common/providers';
+import { RagService } from '../rag/rag.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
@@ -28,8 +29,10 @@ export class ChatbotsService extends BaseService<Chatbot> {
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(Message)
+    @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
     private readonly aiStudioService: AIStudioService,
+    private readonly ragService: RagService,
   ) {
     super();
   }
@@ -239,8 +242,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
     await this.messageRepo.save(userMessage);
 
     try {
+      // RAG Retrieval
+      const relevantContexts = await this.ragService.search(chatDto.message, workspaceId, 3);
+      const contextString = relevantContexts.length > 0
+        ? `\n\n[Context Information]:\n${relevantContexts.join('\n\n')}\n\n[End Context]`
+        : '';
+
       // Build system instruction
-      const systemInstruction = this.buildSystemInstruction(chatbot);
+      const systemInstruction = this.buildSystemInstruction(chatbot) + contextString;
 
       // Call AI Studio API
       const response = await this.aiStudioService.generateResponse(

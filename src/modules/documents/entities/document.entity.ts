@@ -35,6 +35,25 @@ export class Document extends BaseEntity {
   @CreateDateColumn({ type: 'timestamp' })
   uploaded_at: Date;
 
+  @Column({
+    type: 'enum',
+    enum: ['pending', 'processing', 'indexed', 'failed'],
+    default: 'pending',
+  })
+  status: string;
+
+  @Column({ type: 'int', default: 0 })
+  processing_progress: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  processing_message: string;
+
+  @Column({ type: 'int', default: 0 })
+  chunk_count: number;
+
+  @Column({ type: 'text', nullable: true })
+  error_message: string;
+
   // Relations
   @ManyToOne(() => Workspace, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspace_id' })

@@ -31,11 +31,13 @@ const workspace_permissions_module_1 = require("./modules/workspace-permissions/
 const workspace_invitations_module_1 = require("./modules/workspace-invitations/workspace-invitations.module");
 const rbac_seed_module_1 = require("./modules/rbac-seed/rbac-seed.module");
 const chatbots_module_1 = require("./modules/chatbots/chatbots.module");
+const rag_module_1 = require("./modules/rag/rag.module");
 const custom_intents_module_1 = require("./modules/custom-intents/custom-intents.module");
 const custom_responses_module_1 = require("./modules/custom-responses/custom-responses.module");
 const training_data_module_1 = require("./modules/training-data/training-data.module");
 const subscribers_1 = require("./common/subscribers");
 const mail_module_1 = require("./modules/mail/mail.module");
+const bullmq_1 = require("@nestjs/bullmq");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -59,6 +61,16 @@ exports.AppModule = AppModule = __decorate([
                     subscribers: [subscribers_1.BaseEntitySubscriber],
                 }),
             }),
+            bullmq_1.BullModule.forRootAsync({
+                imports: [config_1.ConfigModule],
+                useFactory: async (configService) => ({
+                    connection: {
+                        host: configService.get('REDIS_HOST') ?? 'localhost',
+                        port: Number(configService.get('REDIS_PORT') ?? 6379),
+                    },
+                }),
+                inject: [config_1.ConfigService],
+            }),
             system_roles_module_1.SystemRolesModule,
             workspace_roles_module_1.WorkspaceRolesModule,
             workspace_permissions_module_1.WorkspacePermissionsModule,
@@ -70,6 +82,7 @@ exports.AppModule = AppModule = __decorate([
             workspace_members_module_1.WorkspaceMembersModule,
             workspace_invitations_module_1.WorkspaceInvitationsModule,
             chatbots_module_1.ChatbotsModule,
+            rag_module_1.RagModule,
             custom_intents_module_1.CustomIntentsModule,
             custom_responses_module_1.CustomResponsesModule,
             training_data_module_1.TrainingDataModule,

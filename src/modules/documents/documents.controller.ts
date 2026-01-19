@@ -13,7 +13,10 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { RagEventsService } from '../rag/services/rag-events.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -44,7 +47,10 @@ import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.consta
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly ragEventsService: RagEventsService,
+  ) {}
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))
@@ -213,5 +219,19 @@ export class DocumentsController {
     @User('sub') userId: string,
   ) {
     return this.documentsService.remove(workspaceId, id, userId);
+  }
+
+  @Sse(':id/progress')
+  @ApiOperation({ summary: 'Theo dõi tiến độ xử lý document (SSE)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stream progress events',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_VIEW)
+  progress(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+  ): Observable<any> {
+    return this.ragEventsService.subscribeToDocument(id);
   }
 }

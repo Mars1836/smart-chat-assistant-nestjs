@@ -6,6 +6,7 @@ import { Document } from './entities/document.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { RagModule } from '../rag/rag.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { DocumentsService } from './documents.service';
       }),
       inject: [ConfigService],
     }),
+    RagModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

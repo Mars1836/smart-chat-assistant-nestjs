@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './modules/users/users.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
@@ -22,11 +22,13 @@ import { WorkspacePermissionsModule } from './modules/workspace-permissions/work
 import { WorkspaceInvitationsModule } from './modules/workspace-invitations/workspace-invitations.module';
 import { RbacSeedModule } from './modules/rbac-seed/rbac-seed.module';
 import { ChatbotsModule } from './modules/chatbots/chatbots.module';
+import { RagModule } from './modules/rag/rag.module';
 import { CustomIntentsModule } from './modules/custom-intents/custom-intents.module';
 import { CustomResponsesModule } from './modules/custom-responses/custom-responses.module';
 import { TrainingDataModule } from './modules/training-data/training-data.module';
 import { BaseEntitySubscriber } from './common/subscribers';
 import { MailModule } from './modules/mail/mail.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -47,6 +49,16 @@ import { MailModule } from './modules/mail/mail.module';
         subscribers: [BaseEntitySubscriber],
       }),
     }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('REDIS_HOST') ?? 'localhost',
+          port: Number(configService.get('REDIS_PORT') ?? 6379),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     // RBAC Modules
     SystemRolesModule,
     WorkspaceRolesModule,
@@ -61,6 +73,7 @@ import { MailModule } from './modules/mail/mail.module';
     WorkspaceInvitationsModule,
     // Chatbot Modules
     ChatbotsModule,
+    RagModule,
     CustomIntentsModule,
     CustomResponsesModule,
     TrainingDataModule,

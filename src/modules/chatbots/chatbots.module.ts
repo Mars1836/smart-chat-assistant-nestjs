@@ -9,6 +9,7 @@ import { Message } from '../messages/entities/message.entity';
 import { ChatbotsController } from './chatbots.controller';
 import { ChatbotsService } from './chatbots.service';
 import { AIStudioService } from '../../common/providers';
+import { RagModule } from '../rag/rag.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AIStudioService } from '../../common/providers';
       }),
       inject: [ConfigService],
     }),
+    RagModule,
   ],
   controllers: [ChatbotsController],
   providers: [ChatbotsService, AIStudioService],
