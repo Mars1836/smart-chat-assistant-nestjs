@@ -8,11 +8,15 @@ import {
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
+import { Knowledge } from '../../knowledge/entities/knowledge.entity';
 
 @Entity({ name: 'documents' })
 export class Document extends BaseEntity {
   @Column({ type: 'uuid' })
   workspace_id: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  knowledge_id: string | null;
 
   @Column({ type: 'uuid' })
   user_id: string;
@@ -58,6 +62,13 @@ export class Document extends BaseEntity {
   @ManyToOne(() => Workspace, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
+
+  @ManyToOne(() => Knowledge, (k) => k.documents, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'knowledge_id' })
+  knowledge: Knowledge | null;
 
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'user_id' })

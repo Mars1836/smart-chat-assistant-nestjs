@@ -3,40 +3,103 @@ import { DocumentBuilder } from '@nestjs/swagger';
 export const swaggerConfig = new DocumentBuilder()
   .setTitle('Smart Chat Assistant API')
   .setDescription(
-    'API documentation for Smart Chat Assistant - A workspace-based chatbot system with Gmail, Google Calendar integration, and document processing',
+    `API documentation for Smart Chat Assistant - A workspace-based chatbot system with:
+    
+- **Knowledge Bases**: Upload documents, images → RAG search
+- **Plugins**: Gmail, APIs with OAuth/API Key authentication
+- **Chatbots**: AI-powered with tool calling capabilities
+- **RBAC**: Workspace-level permissions`,
   )
-  .setVersion('2.0')
+  .setVersion('3.0')
   .setContact(
     'Vũ Công Hậu',
     'https://github.com/your-username',
     'your-email@example.com',
   )
   .setLicense('MIT', 'https://opensource.org/licenses/MIT')
-  // Authentication
-  .addTag('auth', 'Authentication & Authorization')
-  // RBAC - System Level
+
+  // ========================
+  // AUTHENTICATION
+  // ========================
+  .addTag('auth', 'Authentication & Authorization (Login, Register, JWT)')
+
+  // ========================
+  // RBAC - SYSTEM LEVEL
+  // ========================
   .addTag('system-roles', 'System Roles (Admin, User)')
-  // Workspaces & Members
+
+  // ========================
+  // WORKSPACES & MEMBERS
+  // ========================
   .addTag('workspaces', 'Workspace Management')
   .addTag('workspace-members', 'Workspace Members')
+  .addTag('workspace-invitations', 'Workspace Invitations')
   .addTag('workspace-roles', 'Workspace Roles (Owner, Moderator, Member)')
   .addTag('workspace-permissions', 'Workspace Permissions')
-  // Chatbots
-  .addTag('chatbots', 'Chatbot Configuration')
+
+  // ========================
+  // KNOWLEDGE BASES (RAG)
+  // ========================
+  .addTag(
+    'knowledge',
+    'Knowledge Base Management - Create knowledge bases, upload documents/images for RAG',
+  )
+  .addTag(
+    'chatbot-knowledge',
+    'Chatbot Knowledge Selection - Link chatbots to knowledge bases',
+  )
+  .addTag(
+    'documents',
+    'Document Upload - Upload PDF, DOCX, TXT, Images to knowledge bases',
+  )
+
+  // ========================
+  // PLUGINS (TOOLS)
+  // ========================
+  .addTag(
+    'tools',
+    'Global Tools/Plugins - System-wide tool definitions (Admin only)',
+  )
+  .addTag(
+    'workspace-tools',
+    'Workspace Plugins - Install/configure plugins for workspace',
+  )
+  .addTag(
+    'chatbot-tools',
+    'Chatbot Plugins - Enable/disable plugins and actions for chatbots',
+  )
+  .addTag('oauth', 'OAuth Authentication - Connect user accounts (Gmail, etc.)')
+
+  // ========================
+  // CHATBOTS
+  // ========================
+  .addTag('chatbots', 'Chatbot Configuration & Chat')
   .addTag('custom-intents', 'Custom Intents for Chatbots')
   .addTag('custom-responses', 'Custom Response Templates')
   .addTag('training-data', 'Training Data Management')
-  // Chat & Conversations
+
+  // ========================
+  // CHAT & CONVERSATIONS
+  // ========================
   .addTag('conversations', 'Chat Conversations')
   .addTag('messages', 'Chat Messages')
-  .addTag('intents', 'Intent Detection (Rasa)')
+  .addTag('intents', 'Intent Detection')
   .addTag('actions', 'Bot Actions & Executions')
-  // Integrations
-  .addTag('documents', 'Document Management & RAG')
+
+  // ========================
+  // INTEGRATIONS
+  // ========================
   .addTag('events', 'Calendar Events (Google Calendar)')
   .addTag('payments', 'Payment Transactions (ZaloPay)')
-  // User Management
+
+  // ========================
+  // USER MANAGEMENT
+  // ========================
   .addTag('users', 'User Profiles')
+
+  // ========================
+  // AUTH SCHEME
+  // ========================
   .addBearerAuth(
     {
       type: 'http',

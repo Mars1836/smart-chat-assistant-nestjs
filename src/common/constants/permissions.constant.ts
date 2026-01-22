@@ -3,6 +3,7 @@ export const WORKSPACE_PERMISSIONS = {
   WORKSPACE_UPDATE: 'workspace.update',
   WORKSPACE_DELETE: 'workspace.delete',
   WORKSPACE_VIEW_SETTINGS: 'workspace.view_settings',
+  WORKSPACE_MANAGE_PLUGINS: 'workspace.manage_plugins',
 
   // Member Management
   MEMBER_INVITE: 'member.invite',

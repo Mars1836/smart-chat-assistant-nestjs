@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { Document } from './entities/document.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { Knowledge } from '../knowledge/entities/knowledge.entity';
 import { CreateDocumentDto, UpdateDocumentDto } from './dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
@@ -14,6 +16,7 @@ import { BaseService } from '../../common/services/base.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { RagService } from '../rag/rag.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 @Injectable()
 export class DocumentsService extends BaseService<Document> {
@@ -22,7 +25,11 @@ export class DocumentsService extends BaseService<Document> {
     private readonly documentRepo: Repository<Document>,
     @InjectRepository(Workspace)
     private readonly workspaceRepo: Repository<Workspace>,
+    @InjectRepository(Knowledge)
+    private readonly knowledgeRepo: Repository<Knowledge>,
     private readonly ragService: RagService,
+    private readonly knowledgeService: KnowledgeService,
+    private readonly jwtService: JwtService,
   ) {
     super();
   }
@@ -32,7 +39,7 @@ export class DocumentsService extends BaseService<Document> {
   }
 
   /**
-   * Upload document
+   * Upload document to a knowledge base
    */
   async create(
     workspaceId: string,
@@ -40,50 +47,70 @@ export class DocumentsService extends BaseService<Document> {
     file: Express.Multer.File,
     createDto: CreateDocumentDto,
   ): Promise<Document> {
-    // Kiểm tra workspace tồn tại và user có quyền
+    // Verify workspace exists
     const workspace = await this.workspaceRepo.findOne({
       where: { id: workspaceId },
     });
-
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
 
+    // Verify knowledge base exists and belongs to workspace
+    const knowledge = await this.knowledgeRepo.findOne({
+      where: { id: createDto.knowledge_id, workspace_id: workspaceId },
+    });
+    if (!knowledge) {
+      throw new NotFoundException('Knowledge base not found in this workspace');
+    }
+
     // Permission check handled by PermissionsGuard
 
-    // Tạo thư mục uploads nếu chưa có
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'documents', workspaceId);
+    // Create uploads directory if not exists
+    const uploadsDir = path.join(
+      process.cwd(),
+      'uploads',
+      'documents',
+      workspaceId,
+    );
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    // Tạo unique filename
+    // Create unique filename
     const ext = path.extname(file.originalname);
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
 
-    // Lưu file vào disk
+    // Save file to disk
     fs.writeFileSync(filePath, file.buffer);
 
-    // Xác định loại file
+    // Determine file type
     const fileType = createDto.type || ext.replace('.', '').toLowerCase();
 
-    // Tạo document record
+    // Create document record
     const document = this.documentRepo.create({
       workspace_id: workspaceId,
+      knowledge_id: createDto.knowledge_id,
       user_id: userId,
       file_name: createDto.file_name || file.originalname,
       file_url: `/uploads/documents/${workspaceId}/${uniqueName}`,
       type: fileType,
       size: file.size,
-      status: 'pending', // Initial status
+      status: 'pending',
     });
 
     const savedDoc = await this.documentRepo.save(document);
 
+    // Update knowledge stats
+    await this.knowledgeService.updateStats(createDto.knowledge_id);
+
     // Trigger RAG Indexing (Async)
-    // Pass the actual mimetype, not the file extension
-    await this.ragService.indexDocument(savedDoc.id, `/uploads/documents/${workspaceId}/${uniqueName}`, file.mimetype, userId);
+    await this.ragService.indexDocument(
+      savedDoc.id,
+      `/uploads/documents/${workspaceId}/${uniqueName}`,
+      fileType,
+      userId,
+    );
 
     return savedDoc;
   }
@@ -162,7 +189,7 @@ export class DocumentsService extends BaseService<Document> {
   }
 
   /**
-   * Xóa document
+   * Delete document
    */
   async remove(
     workspaceId: string,
@@ -170,15 +197,127 @@ export class DocumentsService extends BaseService<Document> {
     userId: string,
   ): Promise<void> {
     const document = await this.findOne(workspaceId, documentId, userId);
+    const knowledgeId = document.knowledge_id;
 
     // Permission check handled by PermissionsGuard
 
-    // Xóa file từ disk
+    // Delete file from disk
     const filePath = path.join(process.cwd(), document.file_url);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
+    // Delete vectors from PostgreSQL and Qdrant
+    await this.ragService.deleteDocumentVectors(documentId);
+
     await this.documentRepo.remove(document);
+
+    // Update knowledge stats
+    if (knowledgeId) {
+      await this.knowledgeService.updateStats(knowledgeId);
+    }
+  }
+
+  /**
+   * Get documents by knowledge base
+   */
+  async findByKnowledge(
+    workspaceId: string,
+    knowledgeId: string,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Document>> {
+    // Verify knowledge belongs to workspace
+    const knowledge = await this.knowledgeRepo.findOne({
+      where: { id: knowledgeId, workspace_id: workspaceId },
+    });
+    if (!knowledge) {
+      throw new NotFoundException('Knowledge base not found');
+    }
+
+    if (!pagination.sortBy) {
+      pagination.sortBy = 'uploaded_at';
+      pagination.sortOrder = 'DESC';
+    }
+
+    return this.paginate(pagination, {
+      where: { knowledge_id: knowledgeId },
+      relations: ['user'],
+    });
+  }
+
+  /**
+   * Generate short-lived access token for viewing document
+   */
+
+  async generateAccessToken(
+    workspaceId: string,
+    documentId: string,
+    userId: string,
+  ): Promise<string> {
+    const document = await this.findOne(workspaceId, documentId, userId);
+    
+    // Check permission handled by findOne (and controller guard)
+
+    const payload = {
+      sub: userId,
+      workspaceId,
+      documentId,
+      type: 'document_access',
+    };
+
+    return this.jwtService.sign(payload, { expiresIn: '5m' }); // Token valid for 5 minutes
+  }
+
+  /**
+   * Get physical file path for document
+   */
+  async getFilePath(
+    workspaceId: string, 
+    documentId: string, 
+    userId: string
+  ): Promise<{ path: string; mimetype: string; filename: string }> {
+     // We define a simpler findOne without permission check if we want to skip overhead, 
+     // but here we reuse findOne to ensure basic access rights first (though the token proves it).
+     // Ideally, validating the token is enough, but checking DB ensures file still exists.
+     
+     const document = await this.documentRepo.findOne({
+      where: { id: documentId, workspace_id: workspaceId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Return absolute path
+    // Note: document.file_url stored as relative: /uploads/documents/...
+    // We need to convert to absolute system path
+    const relativePath = document.file_url.startsWith('/') 
+      ? document.file_url.substring(1) 
+      : document.file_url;
+      
+    const absolutePath = path.join(process.cwd(), relativePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new NotFoundException('File not found on server');
+    }
+
+    return {
+      path: absolutePath,
+      mimetype: this.getMimeType(document.type),
+      filename: document.file_name
+    };
+  }
+
+  private getMimeType(type: string): string {
+    const map: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      txt: 'text/plain',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+    };
+    return map[type.toLowerCase()] || 'application/octet-stream';
   }
 }

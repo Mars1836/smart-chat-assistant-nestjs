@@ -1,6 +1,10 @@
+// Import reflect-metadata FIRST before any entity imports
+import 'reflect-metadata';
+
 import { DataSource } from 'typeorm';
 import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { config } from 'dotenv';
+import { seedTools } from './tools.seed';
 
 // Load environment variables
 config();
@@ -35,9 +39,8 @@ async function runSeeds(): Promise<void> {
     // No manual seeding needed for roles, permissions, and role-permissions
     console.log('ℹ️  RBAC data will be seeded automatically when app starts (RbacSeedService)');
     
-    // Add other seed functions here as needed
-    // await seedUsers(dataSource);
-    // await seedWorkspaces(dataSource);
+    // Seed built-in tools
+    await seedTools(dataSource);
 
     console.log('🎉 All seeds completed successfully!');
   } catch (error) {

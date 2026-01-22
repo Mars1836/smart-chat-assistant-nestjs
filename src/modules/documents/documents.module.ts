@@ -4,13 +4,15 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Document } from './entities/document.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { Knowledge } from '../knowledge/entities/knowledge.entity';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { RagModule } from '../rag/rag.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Document, Workspace]),
+    TypeOrmModule.forFeature([Document, Workspace, Knowledge]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -23,6 +25,7 @@ import { RagModule } from '../rag/rag.module';
       inject: [ConfigService],
     }),
     RagModule,
+    KnowledgeModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

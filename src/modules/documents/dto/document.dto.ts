@@ -1,7 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateDocumentDto {
+  @ApiProperty({
+    description: 'ID của Knowledge base để upload document vào',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsNotEmpty()
+  @IsUUID()
+  knowledge_id: string;
+
   @ApiPropertyOptional({
     description: 'Tên file (nếu không truyền sẽ lấy từ file upload)',
     example: 'tai-lieu-huong-dan.pdf',

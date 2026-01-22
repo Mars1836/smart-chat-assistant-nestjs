@@ -242,8 +242,13 @@ export class ChatbotsService extends BaseService<Chatbot> {
     await this.messageRepo.save(userMessage);
 
     try {
-      // RAG Retrieval
-      const relevantContexts = await this.ragService.search(chatDto.message, workspaceId, 3);
+      // RAG Retrieval - search all workspace documents
+      // TODO: Filter by chatbot's selected knowledge bases
+      const relevantContexts = await this.ragService.search(
+        chatDto.message,
+        { workspaceId },
+        3,
+      );
       const contextString = relevantContexts.length > 0
         ? `\n\n[Context Information]:\n${relevantContexts.join('\n\n')}\n\n[End Context]`
         : '';

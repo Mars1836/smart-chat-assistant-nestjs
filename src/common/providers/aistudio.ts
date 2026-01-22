@@ -1,9 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+export interface GeminiPart {
+  text?: string;
+  inline_data?: {
+    mime_type: string;
+    data: string; // base64 encoded
+  };
+}
+
 export interface GeminiMessage {
   role: 'user' | 'model';
-  parts: Array<{ text: string }>;
+  parts: GeminiPart[];
 }
 
 export interface GeminiRequest {
@@ -265,6 +273,97 @@ export class AIStudioService {
       this.logger.error('Error generating embedding:', error);
       throw error;
     }
+  }
+
+  /**
+   * Extract text/information from image using Gemini Vision
+   * @param imageBuffer - Image file buffer
+   * @param mimeType - Image MIME type (image/png, image/jpeg, etc.)
+   * @param prompt - Optional custom prompt for extraction
+   */
+  async extractFromImage(
+    imageBuffer: Buffer,
+    mimeType: string,
+    prompt?: string,
+  ): Promise<string> {
+    try {
+      const base64Image = imageBuffer.toString('base64');
+
+      const defaultPrompt = `Analyze this image and extract ALL text content you can see. 
+If the image contains a document, extract all the text maintaining the structure.
+If it's a diagram or chart, describe the content and any text labels.
+If there's handwritten text, transcribe it as accurately as possible.
+Provide the extracted content in a clear, organized format.`;
+
+      const requestBody = {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image,
+                },
+              },
+              {
+                text: prompt || defaultPrompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1, // Low temperature for accurate extraction
+          maxOutputTokens: 4096,
+        },
+      };
+
+      // Use a vision-capable model
+      const model = 'gemini-2.0-flash';
+
+      const response = await fetch(
+        `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        this.logger.error(`Gemini Vision API error: ${error}`);
+        throw new Error(`Gemini Vision API error: ${response.status} - ${error}`);
+      }
+
+      const data = (await response.json()) as GeminiResponse;
+
+      if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('No response from Gemini Vision API');
+      }
+
+      return data.candidates[0].content.parts[0].text || '';
+    } catch (error) {
+      this.logger.error('Error extracting from image:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Describe image content for RAG indexing
+   */
+  async describeImage(imageBuffer: Buffer, mimeType: string): Promise<string> {
+    const prompt = `Describe this image in detail for a knowledge base. Include:
+1. Main subject/content of the image
+2. Any text visible in the image (OCR)
+3. Key visual elements and their relationships
+4. Context and meaning (if inferable)
+
+Format the description in a way that would be useful for text search and retrieval.`;
+
+    return this.extractFromImage(imageBuffer, mimeType, prompt);
   }
 
   /**

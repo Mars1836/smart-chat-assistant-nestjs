@@ -41,18 +41,23 @@ import {
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
+import type { Response } from 'express';
+import { StreamableFile, UnauthorizedException, Res, BadRequestException } from '@nestjs/common';
+import * as fs from 'fs';
+import { JwtService } from '@nestjs/jwt';
 
 @ApiTags('documents')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/documents')
 export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly ragEventsService: RagEventsService,
+    private readonly jwtService: JwtService,
   ) {}
 
   @Post()
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload document mới cho workspace' })
@@ -107,6 +112,8 @@ export class DocumentsController {
   }
 
   @Get()
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiExtraModels(DocumentResponseDto, PaginatedResponseDto, PaginationMetaDto)
   @ApiOperation({
     summary: 'Lấy danh sách documents của workspace (có phân trang)',
@@ -167,7 +174,86 @@ export class DocumentsController {
     );
   }
 
+  @Get('view')
+  @ApiOperation({ summary: 'Xem/Tải file (cần access token)' })
+  @ApiConsumes('application/json')
+  @ApiResponse({
+    status: 200,
+    description: 'File content',
+  })
+  @ApiResponse({ status: 400, description: 'Missing or invalid token' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async viewFile(
+    @Param('workspaceId') workspaceId: string,
+    @Query('token') token: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!token) {
+      throw new BadRequestException('Token is required');
+    }
+
+    try {
+      const payload = this.jwtService.verify(token);
+      
+      if (payload.type !== 'document_access' || payload.workspaceId !== workspaceId) {
+        throw new UnauthorizedException('Invalid token for this workspace');
+      }
+
+      const { documentId, sub: userId } = payload;
+
+      const { path: filePath, mimetype, filename } = await this.documentsService.getFilePath(
+        workspaceId,
+        documentId,
+        userId
+      );
+
+      const fileStream = fs.createReadStream(filePath);
+
+      res.set({
+        'Content-Type': mimetype,
+        'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+      });
+
+      return new StreamableFile(fileStream);
+
+    } catch (e) {
+      if (e instanceof UnauthorizedException || e.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+      throw e;
+    }
+  }
+
+  @Get(':id/access-token')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @ApiOperation({ summary: 'Lấy token tạm thời để xem file (5 phút)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Access token generated',
+    schema: {
+      properties: {
+        token: { type: 'string' }
+      }
+    }
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_VIEW)
+  async getAccessToken(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+    @User('sub') userId: string,
+  ) {
+    const token = await this.documentsService.generateAccessToken(
+      workspaceId,
+      id,
+      userId,
+    );
+    return { token };
+  }
+
   @Get(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiOperation({ summary: 'Lấy thông tin chi tiết document' })
   @ApiResponse({
     status: 200,
@@ -186,6 +272,8 @@ export class DocumentsController {
   }
 
   @Patch(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiOperation({ summary: 'Cập nhật thông tin document' })
   @ApiResponse({
     status: 200,
@@ -209,6 +297,8 @@ export class DocumentsController {
   }
 
   @Delete(':id')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiOperation({ summary: 'Xóa document' })
   @ApiResponse({ status: 200, description: 'Document deleted successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -222,6 +312,8 @@ export class DocumentsController {
   }
 
   @Sse(':id/progress')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @ApiOperation({ summary: 'Theo dõi tiến độ xử lý document (SSE)' })
   @ApiResponse({
     status: 200,

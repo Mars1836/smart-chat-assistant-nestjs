@@ -29,6 +29,8 @@ import { TrainingDataModule } from './modules/training-data/training-data.module
 import { BaseEntitySubscriber } from './common/subscribers';
 import { MailModule } from './modules/mail/mail.module';
 import { BullModule } from '@nestjs/bullmq';
+import { ToolsModule } from './modules/tools/tools.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { BullModule } from '@nestjs/bullmq';
     // Chatbot Modules
     ChatbotsModule,
     RagModule,
+    KnowledgeModule,
+    ToolsModule,
     CustomIntentsModule,
     CustomResponsesModule,
     TrainingDataModule,

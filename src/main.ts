@@ -15,10 +15,6 @@ import * as path from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files from uploads directory
-  app.useStaticAssets(path.join(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-  });
 
   // Enable CORS for all domains
   app.enableCors({

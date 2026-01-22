@@ -38,6 +38,8 @@ const training_data_module_1 = require("./modules/training-data/training-data.mo
 const subscribers_1 = require("./common/subscribers");
 const mail_module_1 = require("./modules/mail/mail.module");
 const bullmq_1 = require("@nestjs/bullmq");
+const tools_module_1 = require("./modules/tools/tools.module");
+const knowledge_module_1 = require("./modules/knowledge/knowledge.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -83,6 +85,8 @@ exports.AppModule = AppModule = __decorate([
             workspace_invitations_module_1.WorkspaceInvitationsModule,
             chatbots_module_1.ChatbotsModule,
             rag_module_1.RagModule,
+            knowledge_module_1.KnowledgeModule,
+            tools_module_1.ToolsModule,
             custom_intents_module_1.CustomIntentsModule,
             custom_responses_module_1.CustomResponsesModule,
             training_data_module_1.TrainingDataModule,

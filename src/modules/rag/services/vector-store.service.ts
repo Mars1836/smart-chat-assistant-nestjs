@@ -48,45 +48,71 @@ export class VectorStoreService {
 
   /**
    * Search for similar vectors using Qdrant
+   * @param embedding - Query embedding vector
+   * @param limit - Max results
+   * @param options - Filter options (workspaceId OR knowledgeIds)
    */
-  async search(embedding: number[], limit = 5, workspaceId?: string): Promise<any[]> {
+  async search(
+    embedding: number[],
+    limit = 5,
+    options?: { workspaceId?: string; knowledgeIds?: string[] },
+  ): Promise<any[]> {
     try {
-      // Build filter nếu có workspaceId
       let filter: Record<string, any> | undefined;
-      if (workspaceId) {
-        // Cần lấy danh sách document_ids thuộc workspace
+
+      // Priority: knowledgeIds > workspaceId
+      if (options?.knowledgeIds && options.knowledgeIds.length > 0) {
+        // Search by specific knowledge bases
         const documents = await this.documentRepo.find({
-          where: { workspace_id: workspaceId },
+          where: options.knowledgeIds.map((kid) => ({ knowledge_id: kid })),
           select: ['id'],
         });
         const documentIds = documents.map((d) => d.id);
 
         if (documentIds.length === 0) {
-          return []; // Không có documents trong workspace
+          return []; // No documents in selected knowledge bases
         }
 
         filter = {
           must: [
             {
               key: 'document_id',
-              match: {
-                any: documentIds,
-              },
+              match: { any: documentIds },
+            },
+          ],
+        };
+      } else if (options?.workspaceId) {
+        // Fallback: search all documents in workspace
+        const documents = await this.documentRepo.find({
+          where: { workspace_id: options.workspaceId },
+          select: ['id'],
+        });
+        const documentIds = documents.map((d) => d.id);
+
+        if (documentIds.length === 0) {
+          return [];
+        }
+
+        filter = {
+          must: [
+            {
+              key: 'document_id',
+              match: { any: documentIds },
             },
           ],
         };
       }
 
-      // Tìm kiếm trong Qdrant
+      // Search in Qdrant
       const results = await this.qdrantService.search(embedding, limit, filter);
 
-      // Map results về format tương tự như trước
+      // Map results
       return results.map((hit) => ({
         id: hit.id,
         content: hit.payload.content as string,
         metadata: hit.payload as Record<string, any>,
         document_id: hit.payload.document_id as string,
-        similarity: hit.score, // Qdrant trả về similarity score (0-1, cao hơn = tương tự hơn)
+        similarity: hit.score,
       }));
     } catch (error) {
       this.logger.error('Error executing vector search', error);
