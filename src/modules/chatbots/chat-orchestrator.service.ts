@@ -1,0 +1,303 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+
+import { Chatbot } from './entities/chatbot.entity';
+import { Message } from '../messages/entities/message.entity';
+import { RagService } from '../rag/rag.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
+import { ToolRegistryService } from '../tools/tool-registry.service';
+import { ToolExecutorService } from '../tools/tool-executor.service';
+import { AIStudioService } from '../../common/providers';
+
+type GeminiMessage = {
+  role: 'user' | 'assistant' | 'function';
+  content?: string;
+  functionResponse?: { name: string; response: any };
+  functionCall?: { name: string; args: any };
+};
+
+type GeminiFunctionCall = { name: string; args: any };
+
+const ChatGraphState = Annotation.Root({
+  workspaceId: Annotation<string>,
+  chatbotId: Annotation<string>,
+  userId: Annotation<string>,
+  conversationId: Annotation<string>,
+  userMessage: Annotation<string>,
+  chatbot: Annotation<Chatbot>,
+
+  tools: Annotation<any[]>({
+    reducer: (_left: any[], right: any[]) => right,
+    default: () => [],
+  }),
+
+  systemInstruction: Annotation<string>,
+
+  geminiMessages: Annotation<GeminiMessage[]>({
+    reducer: (left: GeminiMessage[], right: GeminiMessage | GeminiMessage[]) => {
+      if (Array.isArray(right)) return left.concat(right);
+      return left.concat([right]);
+    },
+    default: () => [],
+  }),
+
+  functionCalls: Annotation<GeminiFunctionCall[] | null>({
+    reducer: (_left: GeminiFunctionCall[] | null, right: GeminiFunctionCall[] | null) =>
+      right,
+    default: () => null,
+  }),
+
+  finalResponse: Annotation<string>({
+    reducer: (_left: string, right: string) => right,
+    default: () => '',
+  }),
+
+  turn: Annotation<number>({
+    reducer: (_left: number, right: number) => right,
+    default: () => 0,
+  }),
+
+  maxTurns: Annotation<number>({
+    reducer: (_left: number, right: number) => right,
+    default: () => 5,
+  }),
+});
+
+@Injectable()
+export class ChatOrchestratorService {
+  private readonly logger = new Logger(ChatOrchestratorService.name);
+
+  private readonly graph = new StateGraph(ChatGraphState)
+    .addNode('prepare_tools', async (state: typeof ChatGraphState.State) => {
+      const tools = await this.toolRegistryService.formatForLLMWithPermissions(
+        state.chatbotId,
+      );
+      return { tools };
+    })
+    .addNode('prepare_history', async (state: typeof ChatGraphState.State) => {
+      const history = await this.messageRepo.find({
+        where: { conversation: { id: state.conversationId } },
+        order: { created_at: 'DESC' },
+        take: state.chatbot.max_context_turns * 2,
+      });
+      history.reverse();
+
+      const mapped: GeminiMessage[] = history.map((msg) => ({
+        role: msg.sender_type === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+      }));
+
+      // Ensure last message is the current user message
+      const last = mapped.at(-1);
+      if (!last || last.role !== 'user' || last.content !== state.userMessage) {
+        mapped.push({ role: 'user', content: state.userMessage });
+      }
+
+      return { geminiMessages: mapped };
+    })
+    .addNode(
+      'prepare_knowledge',
+      async (state: typeof ChatGraphState.State) => {
+        const knowledgeIds =
+          await this.knowledgeService.getEnabledKnowledgeIdsForChatbot(
+            state.chatbotId,
+          );
+
+        const contexts =
+          knowledgeIds.length > 0
+            ? await this.ragService.searchForChatbot(
+                state.userMessage,
+                state.chatbotId,
+                knowledgeIds,
+                3,
+              )
+            : await this.ragService.search(
+                state.userMessage,
+                { workspaceId: state.workspaceId },
+                3,
+              );
+
+        const contextString =
+          contexts.length > 0
+            ? `\n\n[Context Information]:\n${contexts.join('\n\n')}\n\n[End Context]`
+            : '';
+
+        const systemInstruction =
+          this.buildSystemInstruction(state.chatbot) + contextString;
+
+        return { systemInstruction };
+      },
+    )
+    .addNode('llm_step', async (state: typeof ChatGraphState.State) => {
+      const nextTurn = state.turn + 1;
+
+      const response = await this.aiStudioService.chat(
+        state.chatbot.llm_model,
+        state.geminiMessages,
+        {
+          temperature: state.chatbot.temperature,
+          maxTokens: state.chatbot.max_tokens,
+          systemInstruction: state.systemInstruction,
+          tools: state.tools as any,
+        },
+      );
+
+      // If Gemini requests tool calls, append assistant functionCall messages now.
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        const calls = response.functionCalls as GeminiFunctionCall[];
+        const callMsgs: GeminiMessage[] = calls.map((call) => ({
+          role: 'assistant',
+          functionCall: { name: call.name, args: call.args },
+        }));
+
+        return {
+          turn: nextTurn,
+          functionCalls: calls,
+          geminiMessages: callMsgs,
+        };
+      }
+
+      if (response.text) {
+        return {
+          turn: nextTurn,
+          functionCalls: null,
+          finalResponse: response.text,
+        };
+      }
+
+      return {
+        turn: nextTurn,
+        functionCalls: null,
+      };
+    })
+    .addNode('execute_tools', async (state: typeof ChatGraphState.State) => {
+      const calls = state.functionCalls ?? [];
+      if (calls.length === 0) return { functionCalls: null };
+
+      const execOne = async (call: GeminiFunctionCall) => {
+        const ctx = {
+          workspaceId: state.workspaceId,
+          userId: state.userId,
+          sessionId: state.conversationId,
+          chatbotId: state.chatbotId,
+        };
+
+        try {
+          return await this.toolExecutorService.execute(call.name, call.args, ctx);
+        } catch (err: any) {
+          // Retry once (simple policy)
+          try {
+            return await this.toolExecutorService.execute(call.name, call.args, ctx);
+          } catch (err2: any) {
+            return {
+              error: err2?.message ?? String(err2),
+            };
+          }
+        }
+      };
+
+      // Execute in parallel for speed
+      const results = await Promise.all(calls.map(execOne));
+
+      const fnResponses: GeminiMessage[] = calls.map((call, idx) => ({
+        role: 'function',
+        functionResponse: {
+          name: call.name,
+          response: results[idx],
+        },
+      }));
+
+      return {
+        functionCalls: null,
+        geminiMessages: fnResponses,
+      };
+    })
+    .addNode('finalize', async (state: typeof ChatGraphState.State) => {
+      if (state.finalResponse && state.finalResponse.trim()) {
+        return {};
+      }
+
+      return {
+        finalResponse:
+          state.chatbot.fallback_message ??
+          'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.',
+      };
+    })
+    .addEdge(START, 'prepare_tools')
+    .addEdge('prepare_tools', 'prepare_history')
+    .addEdge('prepare_history', 'prepare_knowledge')
+    .addEdge('prepare_knowledge', 'llm_step')
+    .addConditionalEdges(
+      'llm_step',
+      (state: typeof ChatGraphState.State) => {
+        if (state.turn >= state.maxTurns) return 'finalize';
+        if (state.functionCalls && state.functionCalls.length > 0) return 'execute_tools';
+        return 'finalize';
+      },
+      {
+        execute_tools: 'execute_tools',
+        finalize: 'finalize',
+      },
+    )
+    .addEdge('execute_tools', 'llm_step')
+    .addEdge('finalize', END)
+    .compile();
+
+  constructor(
+    @InjectRepository(Message)
+    private readonly messageRepo: Repository<Message>,
+    private readonly aiStudioService: AIStudioService,
+    private readonly ragService: RagService,
+    private readonly knowledgeService: KnowledgeService,
+    private readonly toolRegistryService: ToolRegistryService,
+    private readonly toolExecutorService: ToolExecutorService,
+  ) {}
+
+  async runChatTurn(params: {
+    workspaceId: string;
+    chatbotId: string;
+    userId: string;
+    conversationId: string;
+    userMessage: string;
+    chatbot: Chatbot;
+  }): Promise<{ response: string; turns: number }> {
+    const result = await this.graph.invoke({
+      ...params,
+      systemInstruction: '',
+      geminiMessages: [],
+      tools: [],
+      functionCalls: null,
+      finalResponse: '',
+      turn: 0,
+      maxTurns: 5,
+    });
+
+    return {
+      response: result.finalResponse,
+      turns: result.turn,
+    };
+  }
+
+  private buildSystemInstruction(chatbot: Chatbot): string {
+    const parts: string[] = [];
+
+    if (chatbot.personality) {
+      parts.push(chatbot.personality);
+    }
+
+    parts.push(`Bạn đang trả lời bằng ngôn ngữ: ${chatbot.language}`);
+
+    if (chatbot.greeting_message) {
+      parts.push(`Tin nhắn chào: "${chatbot.greeting_message}"`);
+    }
+
+    parts.push(
+      'Hãy trả lời một cách ngắn gọn, rõ ràng và hữu ích. Nếu không chắc chắn, hãy thừa nhận và đề xuất cách khác.',
+    );
+
+    return parts.join('\n');
+  }
+}
+

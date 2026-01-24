@@ -11,6 +11,8 @@ import { ChatbotsService } from './chatbots.service';
 import { AIStudioService } from '../../common/providers';
 import { RagModule } from '../rag/rag.module';
 import { ToolsModule } from '../tools/tools.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { ChatOrchestratorService } from './chat-orchestrator.service';
 
 @Module({
   imports: [
@@ -29,9 +31,10 @@ import { ToolsModule } from '../tools/tools.module';
 
     RagModule,
     ToolsModule,
+    KnowledgeModule,
   ],
   controllers: [ChatbotsController],
-  providers: [ChatbotsService, AIStudioService],
+  providers: [ChatbotsService, AIStudioService, ChatOrchestratorService],
   exports: [TypeOrmModule, ChatbotsService],
 })
 export class ChatbotsModule {}

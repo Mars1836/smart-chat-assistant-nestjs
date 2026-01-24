@@ -24,6 +24,7 @@
     "@google/generative-ai": "^0.24.1",
     "@langchain/community": "^1.1.4",
     "@langchain/core": "^1.1.15",
+    "@langchain/langgraph": "^1.0.0",
     "@langchain/textsplitters": "^1.0.1",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bullmq": "^11.0.4",
