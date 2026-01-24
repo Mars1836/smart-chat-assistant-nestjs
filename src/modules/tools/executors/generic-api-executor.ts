@@ -97,10 +97,19 @@ export class GenericApiExecutor extends BaseToolExecutor {
       const token = await this.getOAuthToken(context, params._toolId);
       authHeaders['Authorization'] = `Bearer ${token}`;
     } else if (authType === 'api_key') {
-      const apiKey = this.config.api_key || params._apiKey;
-      const headerName = this.config.api_key_header || 'X-API-Key';
-      if (apiKey) {
-        authHeaders[headerName] = apiKey;
+      const apiKeyConfig = this.config.api_key || {};
+      const apiKeyValue = apiKeyConfig.value || params._apiKey;
+      
+      if (apiKeyValue) {
+        if (apiKeyConfig.param_type === 'query') {
+          // Will be added to query string later
+          params._injectedQueryAuth = {
+            [apiKeyConfig.param_name || 'key']: apiKeyValue
+          };
+        } else {
+          const headerName = apiKeyConfig.param_name || this.config.api_key_header || 'X-API-Key';
+          authHeaders[headerName] = apiKeyValue;
+        }
       }
     } else if (authType === 'bearer') {
       const token = this.config.bearer_token || params._bearerToken;
@@ -120,6 +129,11 @@ export class GenericApiExecutor extends BaseToolExecutor {
         cleanParams,
         context,
       );
+    }
+
+    // Restore injected auth params (since cleanParams/preProcess might have removed them)
+    if (params._injectedQueryAuth) {
+      processedParams._injectedQueryAuth = params._injectedQueryAuth;
     }
 
     // Build URL with path parameter substitution
@@ -258,9 +272,19 @@ export class GenericApiExecutor extends BaseToolExecutor {
     const queryParams = new URLSearchParams();
 
     for (const [queryKey, paramRef] of Object.entries(queryConfig)) {
-      const value = this.resolveValue(paramRef, params);
+      // Use substituteTemplate to allow {{param}} syntax in query config
+      // This matches the behaviour documented in the class comment examples
+      const value = this.substituteTemplate(paramRef, params);
+      
       if (value !== undefined && value !== null && value !== '') {
-        queryParams.append(queryKey, String(value));
+        queryParams.append(queryKey, value);
+      }
+    }
+
+    // Add injected auth params (e.g. API Key)
+    if (params._injectedQueryAuth) {
+      for (const [key, value] of Object.entries(params._injectedQueryAuth as Record<string, string>)) {
+        queryParams.append(key, value);
       }
     }
 

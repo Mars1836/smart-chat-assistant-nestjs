@@ -248,20 +248,20 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_current_time',
           display_name: 'Get Current Time',
-          description: 'Get the current date and time',
+          description: 'Get the current date and time (includes weekday, day, month, year, time)',
           parameters: {
             type: 'OBJECT',
             properties: {
               timezone: {
                 type: 'string',
                 description:
-                  'Timezone (e.g., "Asia/Ho_Chi_Minh", "UTC"). Default: UTC',
+                  'Timezone (e.g., "Asia/Ho_Chi_Minh", "UTC"). Default: Asia/Ho_Chi_Minh',
               },
             },
             required: [],
           },
           executor_config: {
-            function: 'getCurrentTime',
+            function: 'get_current_time',
           },
           sort_order: 0,
         },
@@ -276,18 +276,18 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
       display_name: 'Weather',
       description: 'Get current weather information for any location',
       category: 'builtin',
-      is_enabled: false, // Disabled by default - needs API key
+      is_enabled: true, // Enabled (requires OPENWEATHER_API_KEY in .env)
       executor_type: 'generic_api',
       executor_config: {
         base_url: 'https://api.openweathermap.org/data/2.5',
         auth_type: 'api_key',
-        api_key_header: 'appid', // OpenWeatherMap uses query param, but this shows the pattern
       },
       auth_config: {
         type: 'api_key',
         api_key: {
-          param_type: 'query', // 'query' or 'header'
+          param_type: 'query',
           param_name: 'appid',
+          value: process.env.OPENWEATHER_API_KEY,
         },
       },
       actions: [
