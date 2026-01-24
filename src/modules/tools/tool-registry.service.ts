@@ -45,28 +45,23 @@ export class ToolRegistryService {
       config_override?: Record<string, any> | null;
     }>
   > {
-    // Get chatbot tool actions (granular per-action permissions)
-    const chatbotToolActions = await this.chatbotToolActionRepo.find({
-      where: { chatbot_id: chatbotId, is_enabled: true },
-      relations: ['tool', 'tool_action'],
-    });
-
-    if (chatbotToolActions.length > 0) {
-      // If chatbot has specific action permissions, use those
-      return chatbotToolActions
-        .filter((cta) => cta.tool_action.is_enabled)
-        .map((cta) => ({
-          tool: cta.tool,
-          action: cta.tool_action,
-          config_override: cta.config_override,
-        }));
-    }
-
-    // Fallback: get all actions from enabled chatbot tools
+    // 1. Get all enabled tools for this chatbot
     const chatbotTools = await this.chatbotToolRepo.find({
       where: { chatbot_id: chatbotId, is_enabled: true },
       relations: ['tool', 'tool.actions'],
     });
+
+    // 2. Get all specific action configurations for this chatbot
+    const chatbotToolActions = await this.chatbotToolActionRepo.find({
+      where: { chatbot_id: chatbotId },
+      relations: ['tool_action'],
+    });
+
+    // Map for quick lookup: actionId -> ChatbotToolAction
+    const actionConfigMap = new Map<string, ChatbotToolAction>();
+    for (const cta of chatbotToolActions) {
+      actionConfigMap.set(cta.tool_action_id, cta);
+    }
 
     const result: Array<{
       tool: Tool;
@@ -75,16 +70,35 @@ export class ToolRegistryService {
     }> = [];
 
     for (const ct of chatbotTools) {
-      if (!ct.tool.is_enabled) continue;
+      if (!ct.tool.is_enabled) {
+        this.logger.debug(`Tool ${ct.tool.name} is disabled (system-wide)`);
+        continue;
+      }
+
+      this.logger.debug(`Checking actions for tool: ${ct.tool.name}, action count: ${ct.tool.actions?.length}`);
 
       for (const action of ct.tool.actions || []) {
-        if (!action.is_enabled) continue;
+        if (action.is_enabled === false) {
+           this.logger.debug(`Action ${action.name} is disabled (system-wide)`);
+           continue;
+        }
 
-        result.push({
-          tool: ct.tool,
-          action,
-          config_override: ct.config_override,
-        });
+        // Check specific permission
+        const cta = actionConfigMap.get(action.id);
+        
+        // If specific config exists, use its is_enabled. 
+        // If NO specific config exists, default to true (since tool is enabled).
+        const isActionEnabled = cta ? cta.is_enabled : true;
+
+        this.logger.debug(`Action ${action.name} of tool ${ct.tool.name} -> Specific Config: ${!!cta}, Final Enabled: ${isActionEnabled}`);
+
+        if (isActionEnabled) {
+          result.push({
+            tool: ct.tool,
+            action,
+            config_override: cta?.config_override ?? ct.config_override,
+          });
+        }
       }
     }
 

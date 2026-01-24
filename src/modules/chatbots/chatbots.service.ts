@@ -199,6 +199,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       const tools = await this.toolRegistryService.formatForLLMWithPermissions(
         chatbotId,
       );
+      this.logger.log(`[Tools Debug] Tools sent to LLM: ${JSON.stringify(tools)}`);
 
       // 2. Prepare Context (History & RAG)
       // Retrieve recent messages for context
