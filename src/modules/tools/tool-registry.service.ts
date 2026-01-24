@@ -159,13 +159,6 @@ export class ToolRegistryService {
         name: `${tool.name}__${action.name}`,
         description: `${tool.display_name}: ${action.description}`,
         parameters: normalized,
-        // Include metadata for execution
-        _metadata: {
-          tool_id: tool.id,
-          action_id: action.id,
-          executor_type: tool.executor_type,
-          config_override,
-        },
       };
     });
   }

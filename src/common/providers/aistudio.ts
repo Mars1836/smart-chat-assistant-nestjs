@@ -7,15 +7,47 @@ export interface GeminiPart {
     mime_type: string;
     data: string; // base64 encoded
   };
+  functionCall?: {
+    name: string;
+    args: Record<string, any>;
+  };
+  functionResponse?: {
+    name: string;
+    response: Record<string, any>;
+  };
 }
 
 export interface GeminiMessage {
-  role: 'user' | 'model';
+  role: 'user' | 'model' | 'function';
   parts: GeminiPart[];
+}
+
+export interface FunctionDeclaration {
+  name: string;
+  description: string;
+  parameters?: {
+    type: 'OBJECT';
+    properties: Record<string, any>;
+    required?: string[];
+  };
+}
+
+export interface Tool {
+  functionAttributes?: string[]; // Not used in standard Gemini API but good for extensibility
+  function_declarations?: FunctionDeclaration[];
+}
+
+export interface ToolConfig {
+  function_calling_config: {
+    mode: 'AUTO' | 'ANY' | 'NONE';
+    allowed_function_names?: string[];
+  };
 }
 
 export interface GeminiRequest {
   contents: GeminiMessage[];
+  tools?: Tool[];
+  toolConfig?: ToolConfig;
   generationConfig?: {
     temperature?: number;
     maxOutputTokens?: number;
@@ -27,7 +59,13 @@ export interface GeminiRequest {
 export interface GeminiResponse {
   candidates: Array<{
     content: {
-      parts: Array<{ text: string }>;
+      parts: Array<{
+        text?: string;
+        functionCall?: {
+          name: string;
+          args: Record<string, any>;
+        };
+      }>;
       role: string;
     };
     finishReason: string;
@@ -70,8 +108,9 @@ export class AIStudioService {
       temperature?: number;
       maxTokens?: number;
       systemInstruction?: string;
+      tools?: FunctionDeclaration[];
     },
-  ): Promise<string> {
+  ): Promise<{ text?: string; functionCalls?: any[] }> {
     try {
       const messages: GeminiMessage[] = [];
 
@@ -79,11 +118,11 @@ export class AIStudioService {
       if (config?.systemInstruction) {
         messages.push({
           role: 'user',
-          parts: [{ text: `[System]: ${config.systemInstruction}` }],
+          parts: [{ text: `[System Instructions]: ${config.systemInstruction}` }],
         });
         messages.push({
           role: 'model',
-          parts: [{ text: 'Understood. I will follow these instructions.' }],
+          parts: [{ text: 'Understood.' }],
         });
       }
 
@@ -102,6 +141,11 @@ export class AIStudioService {
           topK: 40,
         },
       };
+
+      // Add tools if provided
+      if (config?.tools && config.tools.length > 0) {
+        requestBody.tools = [{ function_declarations: config.tools }];
+      }
 
       const response = await fetch(
         `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
@@ -126,8 +170,19 @@ export class AIStudioService {
         throw new Error('No response from Gemini API');
       }
 
-      const text = data.candidates[0].content.parts[0].text;
-      return text;
+      const candidate = data.candidates[0];
+      const parts = candidate.content.parts;
+
+      // Check for function calls
+      const functionCalls = parts
+        .filter((p) => p.functionCall)
+        .map((p) => p.functionCall);
+
+      // Get text content
+      const textParts = parts.filter((p) => p.text).map((p) => p.text);
+      const text = textParts.length > 0 ? textParts.join('\n') : undefined;
+
+      return { text, functionCalls: functionCalls.length > 0 ? functionCalls : undefined };
     } catch (error) {
       this.logger.error('Error calling Gemini API:', error);
       throw error;
@@ -139,13 +194,19 @@ export class AIStudioService {
    */
   async chat(
     model: string,
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    messages: Array<{
+      role: 'user' | 'assistant' | 'function';
+      content?: string;
+      functionResponse?: { name: string; response: any };
+      functionCall?: { name: string; args: any };
+    }>,
     config?: {
       temperature?: number;
       maxTokens?: number;
       systemInstruction?: string;
+      tools?: FunctionDeclaration[];
     },
-  ): Promise<string> {
+  ): Promise<{ text?: string; functionCalls?: any[] }> {
     try {
       const geminiMessages: GeminiMessage[] = [];
 
@@ -153,7 +214,7 @@ export class AIStudioService {
       if (config?.systemInstruction) {
         geminiMessages.push({
           role: 'user',
-          parts: [{ text: `[System]: ${config.systemInstruction}` }],
+          parts: [{ text: `[System Instructions]: ${config.systemInstruction}` }],
         });
         geminiMessages.push({
           role: 'model',
@@ -163,10 +224,40 @@ export class AIStudioService {
 
       // Convert messages
       for (const msg of messages) {
-        geminiMessages.push({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }],
-        });
+        if (msg.role === 'function' && msg.functionResponse) {
+          geminiMessages.push({
+            role: 'function',
+            parts: [
+              {
+                functionResponse: {
+                  name: msg.functionResponse.name,
+                  response: msg.functionResponse.response,
+                },
+              },
+            ],
+          });
+        } else if (msg.role === 'assistant') {
+          const parts: GeminiPart[] = [];
+          if (msg.content) parts.push({ text: msg.content });
+          if (msg.functionCall)
+            parts.push({
+              functionCall: {
+                name: msg.functionCall.name,
+                args: msg.functionCall.args,
+              },
+            });
+
+          geminiMessages.push({
+            role: 'model',
+            parts,
+          });
+        } else {
+          // USER
+          geminiMessages.push({
+            role: 'user',
+            parts: [{ text: msg.content || '' }],
+          });
+        }
       }
 
       const requestBody: GeminiRequest = {
@@ -178,6 +269,11 @@ export class AIStudioService {
           topK: 40,
         },
       };
+
+      // Add tools if provided
+      if (config?.tools && config.tools.length > 0) {
+        requestBody.tools = [{ function_declarations: config.tools }];
+      }
 
       const response = await fetch(
         `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
@@ -201,7 +297,19 @@ export class AIStudioService {
         throw new Error('No response from Gemini API');
       }
 
-      return data.candidates[0].content.parts[0].text;
+      const candidate = data.candidates[0];
+      const parts = candidate.content.parts;
+
+      // Check for function calls
+      const functionCalls = parts
+        .filter((p) => p.functionCall)
+        .map((p) => p.functionCall);
+
+      // Get text content
+      const textParts = parts.filter((p) => p.text).map((p) => p.text);
+      const text = textParts.length > 0 ? textParts.join('\n') : undefined;
+
+      return { text, functionCalls: functionCalls.length > 0 ? functionCalls : undefined };
     } catch (error) {
       this.logger.error('Error in chat:', error);
       throw error;

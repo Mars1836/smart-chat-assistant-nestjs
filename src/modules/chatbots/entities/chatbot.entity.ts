@@ -1,6 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
+import { ChatbotTool } from '../../tools/entities/chatbot-tool.entity';
 
 @Entity({ name: 'chatbots' })
 export class Chatbot extends BaseEntity {
@@ -50,4 +51,7 @@ export class Chatbot extends BaseEntity {
   @ManyToOne(() => Workspace, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
+
+  @OneToMany(() => ChatbotTool, (chatbotTool) => chatbotTool.chatbot)
+  tools: ChatbotTool[];
 }

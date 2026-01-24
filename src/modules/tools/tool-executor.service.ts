@@ -137,7 +137,11 @@ export class ToolExecutorService {
         case 'http_api':
         case 'oauth_api':
           executor = new GenericApiExecutor(
-            tool.executor_config,
+            {
+              ...tool.executor_config,
+              auth_type: tool.auth_config?.type,
+              ...tool.auth_config,
+            },
             this.oauthService,
           );
           break;

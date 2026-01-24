@@ -13,6 +13,8 @@ import { Message } from '../messages/entities/message.entity';
 import { CreateChatbotDto, UpdateChatbotDto, ChatDto } from './dto';
 import { AIStudioService } from '../../common/providers';
 import { RagService } from '../rag/rag.service';
+import { ToolRegistryService } from '../tools/tool-registry.service';
+import { ToolExecutorService } from '../tools/tool-executor.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
@@ -29,10 +31,11 @@ export class ChatbotsService extends BaseService<Chatbot> {
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(Message)
-    @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
     private readonly aiStudioService: AIStudioService,
     private readonly ragService: RagService,
+    private readonly toolRegistryService: ToolRegistryService,
+    private readonly toolExecutorService: ToolExecutorService,
   ) {
     super();
   }
@@ -49,7 +52,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     userId: string,
     createDto: CreateChatbotDto,
   ): Promise<Chatbot> {
-    // Kiểm tra workspace tồn tại và user là owner
+    // Kiểm tra workspace tồn tại
     const workspace = await this.workspaceRepo.findOne({
       where: { id: workspaceId },
     });
@@ -58,14 +61,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new NotFoundException('Workspace not found');
     }
 
-    // Permission check handled by PermissionsGuard
-
-    // TODO: Có thể thêm giới hạn số lượng chatbot theo plan
-    // const count = await this.chatbotRepo.count({ where: { workspace_id: workspaceId } });
-    // if (count >= MAX_CHATBOTS_PER_WORKSPACE) { throw error }
-
     // Tạo chatbot
-    // created_by_id sẽ được tự động thêm bởi BaseEntitySubscriber
     const chatbot = this.chatbotRepo.create({
       workspace_id: workspaceId,
       name: createDto.name,
@@ -95,7 +91,6 @@ export class ChatbotsService extends BaseService<Chatbot> {
     workspaceId: string,
     pagination: PaginationDto,
   ): Promise<PaginatedResult<Chatbot>> {
-    // Kiểm tra user có quyền truy cập workspace
     const workspace = await this.workspaceRepo.findOne({
       where: { id: workspaceId },
     });
@@ -104,9 +99,6 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new NotFoundException('Workspace not found');
     }
 
-    // TODO: Check if user is member of workspace
-
-    // Set default sort if not provided
     if (!pagination.sortBy) {
       pagination.sortBy = 'created_at';
       pagination.sortOrder = 'DESC';
@@ -121,17 +113,6 @@ export class ChatbotsService extends BaseService<Chatbot> {
    * Lấy 1 chatbot theo ID
    */
   async findOne(workspaceId: string, chatbotId: string): Promise<Chatbot> {
-    // Kiểm tra workspace
-    const workspace = await this.workspaceRepo.findOne({
-      where: { id: workspaceId },
-    });
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    // TODO: Check if user is member of workspace
-
     const chatbot = await this.chatbotRepo.findOne({
       where: { id: chatbotId, workspace_id: workspaceId },
     });
@@ -152,26 +133,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
     userId: string,
     updateDto: UpdateChatbotDto,
   ): Promise<Chatbot> {
-    // Kiểm tra workspace owner
-    const workspace = await this.workspaceRepo.findOne({
-      where: { id: workspaceId },
-    });
+    const chatbot = await this.findOne(workspaceId, chatbotId);
 
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    // Permission check handled by PermissionsGuard
-
-    const chatbot = await this.chatbotRepo.findOne({
-      where: { id: chatbotId, workspace_id: workspaceId },
-    });
-
-    if (!chatbot) {
-      throw new NotFoundException('Chatbot not found');
-    }
-
-    // Update
     Object.assign(chatbot, updateDto);
     return await this.chatbotRepo.save(chatbot);
   }
@@ -184,24 +147,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     chatbotId: string,
     userId: string,
   ): Promise<void> {
-    const workspace = await this.workspaceRepo.findOne({
-      where: { id: workspaceId },
-    });
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    // Permission check handled by PermissionsGuard
-
-    const chatbot = await this.chatbotRepo.findOne({
-      where: { id: chatbotId, workspace_id: workspaceId },
-    });
-
-    if (!chatbot) {
-      throw new NotFoundException('Chatbot not found');
-    }
-
+    const chatbot = await this.findOne(workspaceId, chatbotId);
     await this.chatbotRepo.remove(chatbot);
   }
 
@@ -213,7 +159,12 @@ export class ChatbotsService extends BaseService<Chatbot> {
     chatbotId: string,
     userId: string,
     chatDto: ChatDto,
-  ): Promise<{ conversation_id: string; response: string; model: string; processingTime: number }> {
+  ): Promise<{
+    conversation_id: string;
+    response: string;
+    model: string;
+    processingTime: number;
+  }> {
     const startTime = Date.now();
 
     // Lấy chatbot config
@@ -229,7 +180,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found or does not belong to this chatbot');
+      throw new NotFoundException(
+        'Conversation not found or does not belong to this chatbot',
+      );
     }
 
     // Lưu tin nhắn user vào database
@@ -242,37 +195,140 @@ export class ChatbotsService extends BaseService<Chatbot> {
     await this.messageRepo.save(userMessage);
 
     try {
-      // RAG Retrieval - search all workspace documents
-      // TODO: Filter by chatbot's selected knowledge bases
+      // 1. Prepare Tools
+      const tools = await this.toolRegistryService.formatForLLMWithPermissions(
+        chatbotId,
+      );
+
+      // 2. Prepare Context (History & RAG)
+      // Retrieve recent messages for context
+      const history = await this.messageRepo.find({
+        where: { conversation: { id: chatDto.conversation_id } },
+        order: { created_at: 'DESC' },
+        take: chatbot.max_context_turns * 2, // 2 message per turn (user + bot)
+      });
+      history.reverse(); // Newest last
+
+      // RAG Retrieval
       const relevantContexts = await this.ragService.search(
         chatDto.message,
         { workspaceId },
         3,
       );
-      const contextString = relevantContexts.length > 0
-        ? `\n\n[Context Information]:\n${relevantContexts.join('\n\n')}\n\n[End Context]`
-        : '';
+      const contextString =
+        relevantContexts.length > 0
+          ? `\n\n[Context Information]:\n${relevantContexts.join('\n\n')}\n\n[End Context]`
+          : '';
 
-      // Build system instruction
-      const systemInstruction = this.buildSystemInstruction(chatbot) + contextString;
+      const systemInstruction =
+        this.buildSystemInstruction(chatbot) + contextString;
 
-      // Call AI Studio API
-      const response = await this.aiStudioService.generateResponse(
-        chatbot.llm_model,
-        chatDto.message,
-        {
-          temperature: chatbot.temperature,
-          maxTokens: chatbot.max_tokens,
-          systemInstruction,
-        },
-      );
+      // 3. Prepare Initial Messages
+      const geminiMessages: Array<{
+        role: 'user' | 'assistant' | 'function';
+        content?: string;
+        functionResponse?: { name: string; response: any };
+        functionCall?: { name: string; args: any };
+      }> = history.map((msg) => ({
+        role: msg.sender_type === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+      }));
+
+      // Ensure last message is current user message (though we just saved it, history fetch might have missed it if race condition or transaction)
+      // Since we just saved userMessage, we can rely on history fetch including it if atomic,
+      // but to be safe and simple, let's just append current message if history doesn't feature it last.
+      // Actually, since we use `history` for the API calls, better to reconstruct specifically for the turn.
+      // Let's rely on standard flow:
+      // Messages to send = History (excluding current) + Current User Message
+      // Current User Message is already in DB. 'history' array contains it if we fetched after save.
+
+      // 4. Main Execution Loop (Handle Function Calls)
+      let finalResponseText = '';
+      let maxTurns = 5; // Prevent infinite loops
+      let currentTurn = 0;
+
+      while (currentTurn < maxTurns) {
+        currentTurn++;
+
+        const response = await this.aiStudioService.chat(
+          chatbot.llm_model,
+          geminiMessages,
+          {
+            temperature: chatbot.temperature,
+            maxTokens: chatbot.max_tokens,
+            systemInstruction,
+            tools: tools as any, // Cast to any to avoid strict type mismatch if needed
+          },
+        );
+
+        // Handle Function Calls
+        if (response.functionCalls && response.functionCalls.length > 0) {
+          // Append assistant function call to history (for next iteration)
+          // Note: Gemini expects function call to be part of history for function response to make sense
+          // We add the first function call (Gemini usually does one step at a time or parallel)
+          // Our chat interface supports multiple, but let's handle them.
+          
+          for (const call of response.functionCalls) {
+             geminiMessages.push({
+              role: 'assistant',
+              functionCall: { name: call.name, args: call.args },
+            });
+
+            this.logger.log(`Executing tool: ${call.name}`);
+            
+            // Execute Tool
+            let functionResult: any;
+            try {
+              functionResult = await this.toolExecutorService.execute(
+                call.name,
+                call.args,
+                {
+                    workspaceId,
+                    userId,
+                    sessionId: chatDto.conversation_id,
+                    chatbotId, // Added missing required property
+                }
+              );
+            } catch (err: any) {
+              functionResult = { error: err.message };
+            }
+
+            this.logger.debug(`Tool result for ${call.name}: ${JSON.stringify(functionResult)}`);
+
+            // Append Function Response
+            geminiMessages.push({
+              role: 'function',
+              functionResponse: {
+                name: call.name,
+                response: functionResult,
+              },
+            });
+          }
+          
+          // Continue loop to let model interpret results
+          continue;
+        }
+
+        // If text response, we are done
+        if (response.text) {
+          finalResponseText = response.text;
+          break;
+        }
+        
+        // If neither text nor function call (should be rare/error), break
+        break;
+      }
+      
+      if (!finalResponseText) {
+          finalResponseText = "Tôi không thể xử lý yêu cầu này (No response generated).";
+      }
 
       // Lưu tin nhắn bot vào database
       const botMessage = this.messageRepo.create({
         conversation: { id: chatDto.conversation_id } as Conversation,
         sender_type: 'bot',
         sender: null,
-        content: response,
+        content: finalResponseText,
       });
       await this.messageRepo.save(botMessage);
 
@@ -284,7 +340,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
 
       return {
         conversation_id: chatDto.conversation_id,
-        response,
+        response: finalResponseText,
         model: chatbot.llm_model,
         processingTime,
       };

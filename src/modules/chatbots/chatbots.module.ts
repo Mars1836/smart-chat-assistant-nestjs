@@ -10,6 +10,7 @@ import { ChatbotsController } from './chatbots.controller';
 import { ChatbotsService } from './chatbots.service';
 import { AIStudioService } from '../../common/providers';
 import { RagModule } from '../rag/rag.module';
+import { ToolsModule } from '../tools/tools.module';
 
 @Module({
   imports: [
@@ -25,7 +26,9 @@ import { RagModule } from '../rag/rag.module';
       }),
       inject: [ConfigService],
     }),
+
     RagModule,
+    ToolsModule,
   ],
   controllers: [ChatbotsController],
   providers: [ChatbotsService, AIStudioService],
