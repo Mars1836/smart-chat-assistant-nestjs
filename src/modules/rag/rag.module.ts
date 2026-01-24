@@ -9,7 +9,7 @@ import { RagEventsService } from './services/rag-events.service';
 import { DocumentProcessingProcessor } from './processors/document-processing.processor';
 import { Document } from '../documents/entities/document.entity';
 import { RagService } from './rag.service';
-import { AIStudioService } from '../../common/providers/aistudio';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
 
 @Global()
 @Module({
@@ -25,8 +25,9 @@ import { AIStudioService } from '../../common/providers/aistudio';
     VectorStoreService,
     RagEventsService,
     DocumentProcessingProcessor,
+    DocumentProcessingProcessor,
     RagService,
-    AIStudioService,
+    GeminiProvider,
   ],
   exports: [TypeOrmModule, RagService, RagEventsService],
 })

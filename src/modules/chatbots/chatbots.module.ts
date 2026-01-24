@@ -8,7 +8,9 @@ import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
 import { ChatbotsController } from './chatbots.controller';
 import { ChatbotsService } from './chatbots.service';
-import { AIStudioService } from '../../common/providers';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
+import { OpenAIProvider } from '../../common/providers/openai.provider';
+import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { RagModule } from '../rag/rag.module';
 import { ToolsModule } from '../tools/tools.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
@@ -34,7 +36,13 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
     KnowledgeModule,
   ],
   controllers: [ChatbotsController],
-  providers: [ChatbotsService, AIStudioService, ChatOrchestratorService],
+  providers: [
+    ChatbotsService,
+    GeminiProvider,
+    OpenAIProvider,
+    LLMFactoryService,
+    ChatOrchestratorService,
+  ],
   exports: [TypeOrmModule, ChatbotsService],
 })
 export class ChatbotsModule {}

@@ -11,7 +11,7 @@ import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
 import { CreateChatbotDto, UpdateChatbotDto, ChatDto } from './dto';
-import { AIStudioService } from '../../common/providers';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagService } from '../rag/rag.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { ToolExecutorService } from '../tools/tool-executor.service';
@@ -33,7 +33,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
-    private readonly aiStudioService: AIStudioService,
+    private readonly aiStudioService: GeminiProvider,
     private readonly ragService: RagService,
     private readonly toolRegistryService: ToolRegistryService,
     private readonly toolExecutorService: ToolExecutorService,
@@ -165,6 +165,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     conversation_id: string;
     response: string;
     model: string;
+    files: any[];
     processingTime: number;
   }> {
     const startTime = Date.now();
@@ -197,7 +198,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     await this.messageRepo.save(userMessage);
 
     try {
-      const { response: finalResponseText } =
+      const { response: finalResponseText, files } =
         await this.chatOrchestrator.runChatTurn({
           workspaceId,
           chatbotId,
@@ -214,7 +215,22 @@ export class ChatbotsService extends BaseService<Chatbot> {
         sender: null,
         content: finalResponseText,
       });
-      await this.messageRepo.save(botMessage);
+      const savedBotMessage = await this.messageRepo.save(botMessage);
+
+      // Save attachments if any
+      const responseFiles = files || [];
+      if (responseFiles.length > 0) {
+         // Note: We need MessageAttachment repo here, assuming it's cascaded or we inject it
+         // Since we added cascade: true to Message entity, we can just assign and save
+         savedBotMessage.attachments = responseFiles.map((f: any) => ({
+           type: f.type,
+           url: f.url,
+           filename: f.filename,
+           size: f.size,
+           mime_type: f.mime_type
+         })) as any;
+         await this.messageRepo.save(savedBotMessage);
+      }
 
       const processingTime = Date.now() - startTime;
 
@@ -226,6 +242,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         conversation_id: chatDto.conversation_id,
         response: finalResponseText,
         model: chatbot.llm_model,
+        files: responseFiles,
         processingTime,
       };
     } catch (error) {
@@ -248,6 +265,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         conversation_id: chatDto.conversation_id,
         response: fallbackResponse,
         model: chatbot.llm_model,
+        files: [],
         processingTime: Date.now() - startTime,
       };
     }

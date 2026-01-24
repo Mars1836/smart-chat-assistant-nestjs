@@ -21,6 +21,7 @@ import { WorkspaceToolsService } from './workspace-tools.service';
 import { OAuthService } from './oauth.service';
 import { RagModule } from '../rag/rag.module';
 import { AuthModule } from '../auth/auth.module';
+import { FileCleanupModule } from './file-cleanup/file-cleanup.module';
 
 @Module({
   imports: [
@@ -35,9 +36,9 @@ import { AuthModule } from '../auth/auth.module';
       Chatbot,
       Workspace,
     ]),
-    ConfigModule, // For OAuthService to read env vars
     RagModule, // Import to use RagService
     AuthModule, // Import to provide JwtService & JwtAuthGuard in this module context
+    FileCleanupModule,
   ],
   controllers: [
     ToolsController,

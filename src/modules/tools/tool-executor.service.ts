@@ -11,6 +11,8 @@ import { GenericApiExecutor } from './executors/generic-api-executor';
 import { RagService } from '../rag/rag.service';
 import { OAuthService } from './oauth.service';
 
+import { FileCleanupProducer } from './file-cleanup/file-cleanup.producer';
+
 @Injectable()
 export class ToolExecutorService {
   private readonly logger = new Logger(ToolExecutorService.name);
@@ -25,6 +27,7 @@ export class ToolExecutorService {
     private readonly logRepo: Repository<ToolExecutionLog>,
     private readonly ragService: RagService,
     private readonly oauthService: OAuthService,
+    private readonly fileCleanupProducer: FileCleanupProducer,
   ) {}
 
   /**
@@ -129,7 +132,7 @@ export class ToolExecutorService {
           break;
 
         case 'function':
-          executor = new FunctionExecutor(tool.executor_config);
+          executor = new FunctionExecutor(tool.executor_config, this.fileCleanupProducer);
           break;
 
         // Generic API executor handles all API types

@@ -118,7 +118,7 @@ export class MessagesService extends BaseService<Message> {
 
     return this.paginate(messagesPagination, {
       where: { conversation: { id: conversationId } },
-      relations: ['sender', 'intent'],
+      relations: ['sender', 'intent', 'attachments'],
     });
   }
 

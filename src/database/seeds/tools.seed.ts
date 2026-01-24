@@ -327,6 +327,58 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         },
       ],
     },
+
+    // =====================
+    // EXCEL GENERATOR (Function)
+    // =====================
+    {
+      name: 'excel_generator',
+      display_name: 'Excel Generator',
+      description: 'Generate Excel files from data',
+      category: 'builtin',
+      is_enabled: true,
+      executor_type: 'function',
+      executor_config: {},
+      auth_config: { type: 'none' },
+      actions: [
+        {
+          name: 'create_file',
+          display_name: 'Create Excel File',
+          description: 'Create an Excel file with provided data',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              filename: {
+                type: 'string',
+                description: 'Name of the file (without extension)',
+              },
+              columns: {
+                type: 'array',
+                description: 'Array of column definitions {header, key, width}',
+                items: {
+                  type: 'object',
+                  properties: {
+                    header: { type: 'string' },
+                    key: { type: 'string' },
+                    width: { type: 'number' },
+                  },
+                },
+              },
+              data: {
+                type: 'array',
+                description: 'Array of data objects',
+                items: { type: 'object' },
+              },
+            },
+            required: ['data'],
+          },
+          executor_config: {
+            function: 'generate_excel',
+          },
+          sort_order: 0,
+        },
+      ],
+    },
   ];
 
   for (const toolData of builtinTools) {

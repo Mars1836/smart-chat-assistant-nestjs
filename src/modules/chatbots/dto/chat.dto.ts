@@ -38,6 +38,9 @@ export class ChatResponseDto {
   })
   model: string;
 
+  @ApiProperty({ required: false, type: [Object] })
+  files?: any[];
+
   @ApiProperty({
     description: 'Thời gian xử lý (ms)',
     example: 1234,

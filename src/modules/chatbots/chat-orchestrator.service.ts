@@ -9,7 +9,8 @@ import { RagService } from '../rag/rag.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { ToolExecutorService } from '../tools/tool-executor.service';
-import { AIStudioService } from '../../common/providers';
+import { LLMFactoryService } from '../../common/providers/llm-factory.service';
+import { LLMMessage } from '../../common/interfaces/llm-provider.interface';
 
 type GeminiMessage = {
   role: 'user' | 'assistant' | 'function';
@@ -57,6 +58,14 @@ const ChatGraphState = Annotation.Root({
   turn: Annotation<number>({
     reducer: (_left: number, right: number) => right,
     default: () => 0,
+  }),
+
+  files: Annotation<any[]>({
+    reducer: (left: any[], right: any[]) => {
+      if (Array.isArray(right)) return left.concat(right);
+      return left.concat([right]);
+    },
+    default: () => [],
   }),
 
   maxTurns: Annotation<number>({
@@ -132,10 +141,23 @@ export class ChatOrchestratorService {
     )
     .addNode('llm_step', async (state: typeof ChatGraphState.State) => {
       const nextTurn = state.turn + 1;
+      const provider = this.llmFactory.getProvider(state.chatbot.llm_model);
 
-      const response = await this.aiStudioService.chat(
+      const messages: LLMMessage[] = state.geminiMessages.map(msg => ({
+          role: msg.role as any,
+          content: msg.content || (msg as any).parts?.[0]?.text, // Handle legacy parts if present or content directly
+          functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
+          functionResponse: msg.functionResponse || (msg as any).parts?.[0]?.functionResponse 
+            ? {
+                name: msg.functionResponse?.name ?? (msg as any).parts[0].functionResponse.name,
+                response: msg.functionResponse?.response ?? (msg as any).parts[0].functionResponse.response
+              } 
+            : undefined
+      }));
+
+      const response = await provider.chat(
         state.chatbot.llm_model,
-        state.geminiMessages,
+        messages,
         {
           temperature: state.chatbot.temperature,
           maxTokens: state.chatbot.max_tokens,
@@ -144,18 +166,19 @@ export class ChatOrchestratorService {
         },
       );
 
-      // If Gemini requests tool calls, append assistant functionCall messages now.
+      // If provider requests tool calls
       if (response.functionCalls && response.functionCalls.length > 0) {
-        const calls = response.functionCalls as GeminiFunctionCall[];
-        const callMsgs: GeminiMessage[] = calls.map((call) => ({
+        const calls = response.functionCalls;
+        
+        const callMsgs: any[] = calls.map((call) => ({
           role: 'assistant',
           functionCall: { name: call.name, args: call.args },
         }));
 
         return {
           turn: nextTurn,
-          functionCalls: calls,
-          geminiMessages: callMsgs,
+          functionCalls: calls as any,
+          geminiMessages: callMsgs as any,
         };
       }
 
@@ -200,6 +223,35 @@ export class ChatOrchestratorService {
 
       // Execute in parallel for speed
       const results = await Promise.all(calls.map(execOne));
+      
+      this.logger.log(`Tool results: ${JSON.stringify(results)}`);
+
+      // Collect files from results
+      const files: any[] = [];
+      results.forEach((res) => {
+        if (res && res.url && (res.filename || res.path)) {
+           this.logger.log(`Found file in result: ${JSON.stringify(res)}`);
+           // Helper to detect type
+           const isImage = (filename: string, mime?: string) => {
+             if (mime && mime.startsWith('image/')) return true;
+             if (filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename)) return true;
+             return false;
+           };
+
+           const filename = res.filename || 'download';
+           const type = isImage(filename, res.mime_type) ? 'image' : 'file';
+
+           files.push({
+             type,
+             url: res.url,
+             filename,
+             size: res.size,
+             mime_type: res.mime_type
+           });
+        }
+      });
+      
+      this.logger.log(`Extracted files state update: ${JSON.stringify(files)}`);
 
       const fnResponses: GeminiMessage[] = calls.map((call, idx) => ({
         role: 'function',
@@ -212,6 +264,7 @@ export class ChatOrchestratorService {
       return {
         functionCalls: null,
         geminiMessages: fnResponses,
+        files: files,
       };
     })
     .addNode('finalize', async (state: typeof ChatGraphState.State) => {
@@ -248,7 +301,7 @@ export class ChatOrchestratorService {
   constructor(
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
-    private readonly aiStudioService: AIStudioService,
+    private readonly llmFactory: LLMFactoryService,
     private readonly ragService: RagService,
     private readonly knowledgeService: KnowledgeService,
     private readonly toolRegistryService: ToolRegistryService,
@@ -262,7 +315,7 @@ export class ChatOrchestratorService {
     conversationId: string;
     userMessage: string;
     chatbot: Chatbot;
-  }): Promise<{ response: string; turns: number }> {
+  }): Promise<{ response: string; turns: number; files: any[] }> {
     const result = await this.graph.invoke({
       ...params,
       systemInstruction: '',
@@ -272,11 +325,13 @@ export class ChatOrchestratorService {
       finalResponse: '',
       turn: 0,
       maxTurns: 5,
+      files: [],
     });
 
     return {
       response: result.finalResponse,
       turns: result.turn,
+      files: result.files ?? [],
     };
   }
 
@@ -300,4 +355,3 @@ export class ChatOrchestratorService {
     return parts.join('\n');
   }
 }
-

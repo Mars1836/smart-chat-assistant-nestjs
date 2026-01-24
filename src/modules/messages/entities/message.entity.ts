@@ -1,8 +1,9 @@
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Conversation } from '../../conversations/entities/conversation.entity';
 import { User } from '../../users/entities/user.entity';
 import { Intent } from '../../intents/entities/intent.entity';
+import { MessageAttachment } from './message-attachment.entity';
 
 @Entity({ name: 'messages' })
 export class Message extends BaseEntity {
@@ -20,4 +21,9 @@ export class Message extends BaseEntity {
 
   @ManyToOne(() => Intent, { nullable: true })
   intent: Intent | null;
+
+  @OneToMany(() => MessageAttachment, (attachment) => attachment.message, {
+    cascade: true,
+  })
+  attachments: MessageAttachment[];
 }

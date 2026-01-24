@@ -40,6 +40,8 @@ const mail_module_1 = require("./modules/mail/mail.module");
 const bullmq_1 = require("@nestjs/bullmq");
 const tools_module_1 = require("./modules/tools/tools.module");
 const knowledge_module_1 = require("./modules/knowledge/knowledge.module");
+const serve_static_1 = require("@nestjs/serve-static");
+const path_1 = require("path");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -72,6 +74,10 @@ exports.AppModule = AppModule = __decorate([
                     },
                 }),
                 inject: [config_1.ConfigService],
+            }),
+            serve_static_1.ServeStaticModule.forRoot({
+                rootPath: (0, path_1.join)(process.cwd(), 'uploads'),
+                serveRoot: '/uploads',
             }),
             system_roles_module_1.SystemRolesModule,
             workspace_roles_module_1.WorkspaceRolesModule,

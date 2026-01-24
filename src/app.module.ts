@@ -31,6 +31,8 @@ import { MailModule } from './modules/mail/mail.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ToolsModule } from './modules/tools/tools.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -60,6 +62,10 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
         },
       }),
       inject: [ConfigService],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
     // RBAC Modules
     SystemRolesModule,

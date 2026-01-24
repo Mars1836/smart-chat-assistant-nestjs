@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import pdf from 'pdf-parse';
 import * as mammoth from 'mammoth';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { AIStudioService } from '../../../common/providers/aistudio';
+import { GeminiProvider } from '../../../common/providers/gemini.provider';
 
 // Supported image MIME types (full + extensions)
 const IMAGE_MIME_TYPES = [
@@ -32,7 +32,7 @@ const EXTENSION_TO_MIME: Record<string, string> = {
 export class DocumentParsingService {
   private readonly logger = new Logger(DocumentParsingService.name);
 
-  constructor(private readonly aiStudioService: AIStudioService) {}
+  constructor(private readonly aiStudioService: GeminiProvider) {}
 
   /**
    * Normalize mimetype - convert file extension to proper MIME type

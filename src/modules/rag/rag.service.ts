@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { VectorStoreService } from './services/vector-store.service';
-import { AIStudioService } from '../../common/providers/aistudio';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagEventsService } from './services/rag-events.service';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class RagService {
   constructor(
     @InjectQueue('document-queue') private readonly documentQueue: Queue,
     private readonly vectorStoreService: VectorStoreService,
-    private readonly aiStudio: AIStudioService,
+    private readonly aiStudio: GeminiProvider,
     private readonly eventsService: RagEventsService,
   ) {}
 

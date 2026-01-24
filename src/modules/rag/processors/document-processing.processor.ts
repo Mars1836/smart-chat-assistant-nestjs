@@ -7,7 +7,7 @@ import { Document } from '../../documents/entities/document.entity';
 import { DocumentParsingService } from '../services/document-parsing.service';
 import { VectorStoreService } from '../services/vector-store.service';
 import { RagEventsService } from '../services/rag-events.service';
-import { AIStudioService } from '../../../common/providers/aistudio';
+import { GeminiProvider } from '../../../common/providers/gemini.provider';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -20,7 +20,7 @@ export class DocumentProcessingProcessor extends WorkerHost {
     private readonly documentRepo: Repository<Document>,
     private readonly parsingService: DocumentParsingService,
     private readonly vectorStoreService: VectorStoreService,
-    private readonly aiStudio: AIStudioService,
+    private readonly aiStudio: GeminiProvider,
     private readonly eventsService: RagEventsService,
   ) {
     super();
