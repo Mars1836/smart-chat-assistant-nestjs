@@ -11,6 +11,11 @@ export class AddKnowledgeToChatbotDto {
   @Min(0)
   @IsOptional()
   priority?: number;
+
+  @ApiPropertyOptional({ description: 'Enable/disable this knowledge for chatbot', default: true })
+  @IsBoolean()
+  @IsOptional()
+  is_enabled?: boolean;
 }
 
 export class UpdateChatbotKnowledgeDto {

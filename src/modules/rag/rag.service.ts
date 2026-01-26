@@ -44,7 +44,7 @@ export class RagService {
    */
   async search(
     query: string,
-    options: { workspaceId?: string; knowledgeIds?: string[] },
+    options: { workspaceId?: string; knowledgeIds?: string[]; minScore?: number },
     limit = 5,
   ): Promise<string[]> {
     try {
@@ -55,6 +55,11 @@ export class RagService {
 
       // 2. Search vectors with knowledge filter
       const results = await this.vectorStoreService.search(embedding, limit, options);
+      
+      this.logger.log(`Found ${results.length} relevant documents`);
+      results.forEach((r, idx) => {
+        this.logger.debug(`Result ${idx + 1}: [Score: ${r.similarity}] ${r.content.substring(0, 100)}...`);
+      });
 
       // 3. Return content
       return results.map((r) => r.content);
@@ -72,12 +77,13 @@ export class RagService {
     chatbotId: string,
     knowledgeIds: string[],
     limit = 5,
+    minScore?: number,
   ): Promise<string[]> {
     if (!knowledgeIds || knowledgeIds.length === 0) {
       this.logger.warn(`Chatbot ${chatbotId} has no knowledge bases linked`);
       return [];
     }
-    return this.search(query, { knowledgeIds }, limit);
+    return this.search(query, { knowledgeIds, minScore }, limit);
   }
 
   /**

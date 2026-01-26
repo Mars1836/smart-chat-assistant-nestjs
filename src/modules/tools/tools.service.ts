@@ -7,6 +7,7 @@ import { WorkspaceTool } from './entities/workspace-tool.entity';
 import { UserToolCredential } from './entities/user-tool-credential.entity';
 import { CreateToolDto, CreateToolActionDto } from './dto/create-tool.dto';
 import { UpdateToolDto, UpdateToolActionDto } from './dto/update-tool.dto';
+import { maskApiKeyInConfigOverride, sanitizeToolAuthConfig } from './utils/secret-mask.util';
 
 export interface ToolWithMeta extends Tool {
   workspace_tool?: {
@@ -109,10 +110,11 @@ export class ToolsService {
 
       const result: ToolWithMeta = {
         ...tool,
+        auth_config: sanitizeToolAuthConfig((tool as any).auth_config),
         workspace_tool: wsMeta
           ? {
               is_enabled: wsMeta.is_enabled,
-              config_override: wsMeta.config_override,
+              config_override: maskApiKeyInConfigOverride(wsMeta.config_override),
               added_by: wsMeta.added_by,
               created_at: wsMeta.created_at,
               updated_at: wsMeta.updated_at,
@@ -173,9 +175,10 @@ export class ToolsService {
 
       const result: ToolWithMeta = {
         ...tool,
+        auth_config: sanitizeToolAuthConfig((tool as any).auth_config),
         workspace_tool: {
           is_enabled: wt.is_enabled,
-          config_override: wt.config_override,
+          config_override: maskApiKeyInConfigOverride(wt.config_override),
           added_by: wt.added_by,
           created_at: wt.created_at,
           updated_at: wt.updated_at,

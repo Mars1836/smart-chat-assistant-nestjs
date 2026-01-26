@@ -121,12 +121,9 @@ export class ChatOrchestratorService {
                 state.chatbotId,
                 knowledgeIds,
                 3,
+                state.chatbot.confidence_threshold,
               )
-            : await this.ragService.search(
-                state.userMessage,
-                { workspaceId: state.workspaceId },
-                3,
-              );
+            : []; // If no knowledge linked, skip RAG (do not fallback to workspace search)
 
         const contextString =
           contexts.length > 0

@@ -1,6 +1,11 @@
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { Tool } from '../../modules/tools/entities/tool.entity';
 import { ToolAction } from '../../modules/tools/entities/tool-action.entity';
+import { ToolExecutionLog } from '../../modules/tools/entities/tool-execution-log.entity';
+import { WorkspaceTool } from '../../modules/tools/entities/workspace-tool.entity';
+import { ChatbotTool } from '../../modules/tools/entities/chatbot-tool.entity';
+import { ChatbotToolAction } from '../../modules/tools/entities/chatbot-tool-action.entity';
+import { UserToolCredential } from '../../modules/tools/entities/user-tool-credential.entity';
 
 interface ToolSeedData {
   name: string;
@@ -27,6 +32,42 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
 
   const toolRepo = dataSource.getRepository(Tool);
   const actionRepo = dataSource.getRepository(ToolAction);
+  const logRepo = dataSource.getRepository(ToolExecutionLog);
+  const workspaceToolRepo = dataSource.getRepository(WorkspaceTool);
+  const chatbotToolRepo = dataSource.getRepository(ChatbotTool);
+  const chatbotToolActionRepo = dataSource.getRepository(ChatbotToolAction);
+  const userToolCredentialRepo = dataSource.getRepository(UserToolCredential);
+
+  // =====================
+  // Cleanup removed tools (safe to run repeatedly)
+  // =====================
+  const removedToolNames = [
+    'pollinations_image_generator',
+  ];
+
+  const removedTools = await toolRepo.find({
+    where: { name: In(removedToolNames) },
+    select: ['id', 'name'],
+  });
+
+  if (removedTools.length > 0) {
+    console.log(
+      `🧹 Cleaning up removed tools: ${removedTools.map((t) => t.name).join(', ')}`,
+    );
+    for (const t of removedTools) {
+      // Delete all related rows first to avoid FK constraint errors
+      // Order matters: children -> parent
+      await chatbotToolActionRepo.delete({ tool_id: t.id });
+      await chatbotToolRepo.delete({ tool_id: t.id });
+      await workspaceToolRepo.delete({ tool_id: t.id });
+      await userToolCredentialRepo.delete({ tool_id: t.id });
+      await actionRepo.delete({ tool_id: t.id });
+      await logRepo.delete({ tool_id: t.id });
+
+      await toolRepo.delete({ id: t.id });
+    }
+    console.log('🧹 Cleanup done.');
+  }
 
   const builtinTools: ToolSeedData[] = [
     // NOTE: RAG is now handled via Knowledge system (not as a plugin)
@@ -292,9 +333,9 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
       },
       actions: [
         {
-          name: 'get_current',
+          name: 'get_current_weather',
           display_name: 'Get Current Weather',
-          description: 'Get current weather for a city',
+          description: 'Get current weather data including temperature, conditions, humidity, wind, etc. for a specific city.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -304,8 +345,9 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
               },
               units: {
                 type: 'string',
-                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit)',
+                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
                 enum: ['metric', 'imperial'],
+                default: 'metric',
               },
             },
             required: ['city'],
@@ -319,17 +361,82 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
                 units: '{{units}}',
               },
             },
-            response_transform: 'main',
+            // Removed response_transform to allow access to full response (including coord)
             success_message:
-              'Weather in {{city}}: {{_response.temp}}° (feels like {{_response.feels_like}}°)',
+              'Current weather in {{_response.name}}: {{_response.main.temp}}° (Feels like {{_response.main.feels_like}}°). Condition: {{_response.weather.0.description}}.',
           },
           sort_order: 0,
+        },
+        {
+          name: 'get_forecast_weather',
+          display_name: 'Get 5-Day Forecast',
+          description: 'Get weather forecast for the next 5 days with 3-hour intervals.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              city: {
+                type: 'string',
+                description: 'City name (e.g., "London", "Ho Chi Minh City")',
+              },
+              units: {
+                type: 'string',
+                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
+                enum: ['metric', 'imperial'],
+                default: 'metric',
+              },
+            },
+            required: ['city'],
+          },
+          executor_config: {
+            method: 'GET',
+            endpoint: '/forecast',
+            params: {
+              query: {
+                q: '{{city}}',
+                units: '{{units}}',
+              },
+            },
+            success_message: 'Forecast retrieved for {{_response.city.name}}.',
+          },
+          sort_order: 1,
+        },
+        {
+          name: 'get_air_pollution',
+          display_name: 'Get Air Pollution',
+          description: 'Get current, forecast, and historical air pollution data (AQI, CO, NO, NO2, O3, SO2, PM2.5, PM10, NH3). Requires latitude and longitude.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              lat: {
+                type: 'number',
+                description: 'Latitude',
+              },
+              lon: {
+                type: 'number',
+                description: 'Longitude',
+              },
+            },
+            required: ['lat', 'lon'],
+          },
+          executor_config: {
+            method: 'GET',
+            endpoint: '/air_pollution',
+            params: {
+              query: {
+                lat: '{{lat}}',
+                lon: '{{lon}}',
+              },
+            },
+            success_message: 'Air pollution data retrieved. AQI: {{_response.list.0.main.aqi}}',
+          },
+          sort_order: 2,
         },
       ],
     },
 
     // =====================
     // EXCEL GENERATOR (Function)
+    // =====================
     // =====================
     {
       name: 'excel_generator',

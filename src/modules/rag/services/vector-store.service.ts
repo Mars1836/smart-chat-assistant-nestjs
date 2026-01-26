@@ -55,7 +55,7 @@ export class VectorStoreService {
   async search(
     embedding: number[],
     limit = 5,
-    options?: { workspaceId?: string; knowledgeIds?: string[] },
+    options?: { workspaceId?: string; knowledgeIds?: string[]; minScore?: number },
   ): Promise<any[]> {
     try {
       let filter: Record<string, any> | undefined;
@@ -107,13 +107,20 @@ export class VectorStoreService {
       const results = await this.qdrantService.search(embedding, limit, filter);
 
       // Map results
-      return results.map((hit) => ({
+      const mappedResults = results.map((hit) => ({
         id: hit.id,
         content: hit.payload.content as string,
         metadata: hit.payload as Record<string, any>,
         document_id: hit.payload.document_id as string,
         similarity: hit.score,
       }));
+
+      // Filter by minScore if provided
+      if (options?.minScore) {
+        return mappedResults.filter((r) => r.similarity >= options.minScore!);
+      }
+
+      return mappedResults;
     } catch (error) {
       this.logger.error('Error executing vector search', error);
       throw error;

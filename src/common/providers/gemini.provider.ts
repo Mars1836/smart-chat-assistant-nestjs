@@ -137,7 +137,7 @@ export class GeminiProvider implements ILLMProvider {
       }
 
       const candidate = data.candidates[0];
-      const parts = candidate.content.parts;
+      const parts = candidate.content?.parts || [];
 
       const functionCalls = parts
         .filter((p: any) => p.functionCall)
@@ -279,21 +279,20 @@ Format the description in a way that would be useful for text search and retriev
   }
 
   async listModels(): Promise<string[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
-      if (!response.ok) {
-        throw new Error(`Failed to list models: ${response.status}`);
-      }
-      const data = (await response.json()) as { models?: Array<{ name: string }> };
-      return data.models?.map((m) => m.name.replace('models/', '')) ?? [];
-    } catch (error) {
-      this.logger.error('Error listing models:', error);
-      return [
+      // const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
+      // if (!response.ok) {
+      //   throw new Error(`Failed to list models: ${response.status}`);
+      // }
+      // const data = (await response.json()) as { models?: Array<{ name: string }> };
+      const allowedModels = [
         'gemini-2.5-pro',
         'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
         'gemini-2.0-flash',
         'gemini-2.0-flash-lite',
       ];
+
+      return allowedModels;
     }
-  }
+  
 }

@@ -24,8 +24,10 @@ import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.consta
 import { WorkspaceToolsService } from './workspace-tools.service';
 import { AddWorkspaceToolDto } from './dto/add-workspace-tool.dto';
 import { UpdateWorkspaceToolDto } from './dto/update-workspace-tool.dto';
+import { CreateToolDto } from './dto/create-tool.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { Request } from 'express';
+import { maskApiKeyInConfigOverride } from './utils/secret-mask.util';
 
 @ApiTags('workspace-tools')
 @ApiBearerAuth('JWT-auth')
@@ -73,6 +75,35 @@ export class WorkspaceToolsController {
     return this.toolsService.findWorkspaceInstalledTools(workspaceId, user?.sub);
   }
 
+  @Post('custom')
+  @ApiOperation({ summary: 'Tạo custom tool/plugin mới cho workspace' })
+  @ApiResponse({ status: 201, description: 'Custom tool created and added to workspace' })
+  @ApiBody({ type: CreateToolDto })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_MANAGE_PLUGINS)
+  async createCustomTool(
+    @Param('workspaceId') workspaceId: string,
+    @Body() dto: CreateToolDto,
+    @Req() req: Request,
+  ) {
+    const workspaceTool = await this.workspaceToolsService.createCustomTool(
+      workspaceId,
+      dto,
+      (req as any).user?.id,
+    );
+
+    const toolWithMeta = await this.toolsService.findOne(workspaceTool.tool_id);
+    return {
+      ...toolWithMeta,
+      workspace_tool: {
+        is_enabled: workspaceTool.is_enabled,
+        config_override: maskApiKeyInConfigOverride(workspaceTool.config_override),
+        added_by: workspaceTool.added_by,
+        created_at: workspaceTool.created_at,
+        updated_at: workspaceTool.updated_at,
+      },
+    };
+  }
+
   @Post()
   @ApiOperation({ summary: 'Thêm tool vào workspace (cài đặt plugin)' })
   @ApiResponse({ status: 201, description: 'Tool added to workspace' })
@@ -96,7 +127,7 @@ export class WorkspaceToolsController {
       ...toolWithMeta,
       workspace_tool: {
         is_enabled: workspaceTool.is_enabled,
-        config_override: workspaceTool.config_override,
+        config_override: maskApiKeyInConfigOverride(workspaceTool.config_override),
         added_by: workspaceTool.added_by,
         created_at: workspaceTool.created_at,
         updated_at: workspaceTool.updated_at,
@@ -124,7 +155,7 @@ export class WorkspaceToolsController {
       ...tool,
       workspace_tool: {
         is_enabled: updated.is_enabled,
-        config_override: updated.config_override,
+        config_override: maskApiKeyInConfigOverride(updated.config_override),
         added_by: updated.added_by,
         created_at: updated.created_at,
         updated_at: updated.updated_at,

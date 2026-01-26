@@ -12,6 +12,7 @@ import { ChatbotTool } from './entities/chatbot-tool.entity';
 import { ChatbotToolAction } from './entities/chatbot-tool-action.entity';
 import { AddWorkspaceToolDto } from './dto/add-workspace-tool.dto';
 import { UpdateWorkspaceToolDto } from './dto/update-workspace-tool.dto';
+import { CreateToolDto } from './dto/create-tool.dto';
 
 @Injectable()
 export class WorkspaceToolsService {
@@ -114,5 +115,32 @@ export class WorkspaceToolsService {
     }
 
     await this.workspaceToolRepo.remove(workspaceTool);
+  }
+
+  async createCustomTool(
+    workspaceId: string,
+    dto: CreateToolDto,
+    userId: string,
+  ): Promise<WorkspaceTool> {
+    // 1. Create Tool (Force category='custom')
+    const tool = this.toolRepo.create({
+      ...dto,
+      category: 'custom',
+      is_public: false, // Custom tools are private to workspace
+      created_by_id: userId,
+    });
+    const savedTool = await this.toolRepo.save(tool);
+
+    // 2. Add to Workspace
+    const workspaceTool = this.workspaceToolRepo.create({
+      workspace_id: workspaceId,
+      tool_id: savedTool.id,
+      is_enabled: true,
+      config_override: null,
+      added_by: userId,
+      created_by_id: userId,
+    });
+
+    return this.workspaceToolRepo.save(workspaceTool);
   }
 }

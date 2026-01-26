@@ -67,8 +67,8 @@ export class CreateToolDto {
   @IsOptional()
   is_enabled?: boolean = true;
 
-  @IsIn(['http_api', 'function', 'rag', 'oauth_api', 'database'])
-  executor_type: 'http_api' | 'function' | 'rag' | 'oauth_api' | 'database';
+  @IsIn(['generic_api', 'http_api', 'function', 'rag', 'oauth_api', 'database'])
+  executor_type: 'generic_api' | 'http_api' | 'function' | 'rag' | 'oauth_api' | 'database';
 
   @IsObject()
   @IsOptional()

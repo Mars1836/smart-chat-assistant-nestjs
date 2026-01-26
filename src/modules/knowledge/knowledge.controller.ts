@@ -134,6 +134,7 @@ export class ChatbotKnowledgeController {
       chatbotId,
       dto.knowledge_id,
       dto.priority,
+      dto.is_enabled,
     );
   }
 

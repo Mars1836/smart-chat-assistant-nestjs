@@ -139,6 +139,7 @@ export class KnowledgeService {
     chatbotId: string,
     knowledgeId: string,
     priority = 0,
+    isEnabled = true,
   ): Promise<ChatbotKnowledge> {
     // Check if already exists
     const existing = await this.chatbotKnowledgeRepo.findOne({
@@ -152,7 +153,7 @@ export class KnowledgeService {
     const link = this.chatbotKnowledgeRepo.create({
       chatbot_id: chatbotId,
       knowledge_id: knowledgeId,
-      is_enabled: true,
+      is_enabled: isEnabled,
       priority,
     });
 

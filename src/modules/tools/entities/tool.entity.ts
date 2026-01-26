@@ -20,6 +20,9 @@ export class Tool extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   is_enabled: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  is_public: boolean;
+
   // Executor type for this tool
   // 'generic_api' is the new unified type for all API calls (REST, OAuth, etc.)
   // 'http_api' and 'oauth_api' kept for backwards compatibility
