@@ -15,8 +15,11 @@ export class Conversation extends BaseEntity {
   @Column({ type: 'uuid' })
   workspace_id: string;
 
-  @Column({ type: 'uuid' })
-  user_id: string;
+  @Column({ type: 'uuid', nullable: true })
+  user_id: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  visitor_id: string | null;
 
   @Column({ type: 'uuid' })
   chatbot_id: string;
@@ -32,9 +35,9 @@ export class Conversation extends BaseEntity {
   @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
 
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user: User | null;
 
   @ManyToOne(() => Chatbot, { nullable: false })
   @JoinColumn({ name: 'chatbot_id' })

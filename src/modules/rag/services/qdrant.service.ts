@@ -7,7 +7,7 @@ export class QdrantService implements OnModuleInit {
   private readonly logger = new Logger(QdrantService.name);
   private client: QdrantClient;
   private readonly collectionName = 'document_vectors';
-  private readonly vectorSize = 768; // Gemini embeddings dimension
+  private readonly vectorSize = 3072; // gemini-embedding-001 dimension
 
   constructor(private readonly configService: ConfigService) {}
 

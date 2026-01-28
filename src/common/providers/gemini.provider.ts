@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
 import {
   ILLMProvider,
   LLMConfig,
@@ -24,6 +25,7 @@ export class GeminiProvider implements ILLMProvider {
   private readonly logger = new Logger(GeminiProvider.name);
   private readonly apiKey: string;
   private readonly baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  private readonly genAI: GoogleGenAI;
 
   constructor(private readonly configService: ConfigService) {
     this.apiKey =
@@ -34,6 +36,8 @@ export class GeminiProvider implements ILLMProvider {
         'GOOGLE_AI_STUDIO_API_KEY is not set. Gemini features will not work.',
       );
     }
+
+    this.genAI = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
   async generateResponse(
@@ -158,29 +162,20 @@ export class GeminiProvider implements ILLMProvider {
 
   async generateEmbedding(text: string): Promise<number[]> {
     try {
-      // Default to text-embedding-004 logic from previous service, 
-      // but strictly speaking model param should control this. 
-      // For now hardcoding the embedding model suffix call style or just using a default
-      const model = 'text-embedding-004';
-      const requestBody = {
-        content: { parts: [{ text }] },
-      };
-
-      const response = await fetch(
-        `${this.baseUrl}/models/${model}:embedContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
+      // Use gemini-embedding-001 via SDK (3072 dimensions, high quality)
+      const response = await this.genAI.models.embedContent({
+        model: 'gemini-embedding-001',
+        contents: text,
+        config: {
+          taskType: 'SEMANTIC_SIMILARITY',
         },
-      );
+      });
 
-      if (!response.ok) {
-        throw new Error(`Gemini Embedding API error: ${response.status}`);
+      if (!response.embeddings || response.embeddings.length === 0) {
+        throw new Error('No embeddings returned from Gemini API');
       }
 
-      const data = await response.json();
-      return data.embedding.values;
+      return response.embeddings[0].values as number[];
     } catch (error) {
       this.logger.error('Error generating embedding:', error);
       throw error;

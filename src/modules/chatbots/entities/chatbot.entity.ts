@@ -47,6 +47,20 @@ export class Chatbot extends BaseEntity {
   @Column({ type: 'integer', default: 1000 })
   max_tokens: number;
 
+  // Widget configuration for embeddable chat widget
+  // Example shape:
+  // {
+  //   enabled: true,
+  //   position: 'bottom-right',
+  //   primaryColor: '#4f46e5',
+  //   title: 'Hỗ trợ khách hàng',
+  //   greeting: 'Xin chào...',
+  //   allowedOrigins: ['https://example.com'],
+  //   lang: 'vi'
+  // }
+  @Column({ type: 'jsonb', nullable: true })
+  widget_config: Record<string, any> | null;
+
   // Relations
   @ManyToOne(() => Workspace, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspace_id' })

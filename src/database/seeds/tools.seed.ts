@@ -43,7 +43,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
   // =====================
   const removedToolNames = [
     'pollinations_image_generator',
-  ];
+  ] as const;
 
   const removedTools = await toolRepo.find({
     where: { name: In(removedToolNames) },

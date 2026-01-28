@@ -120,4 +120,20 @@ export class CreateChatbotDto {
   @IsOptional()
   @Min(1)
   max_tokens?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Cấu hình widget cho website embed (enabled, position, màu sắc, domain, ...)',
+    example: {
+      enabled: true,
+      position: 'bottom-right',
+      primaryColor: '#4f46e5',
+      title: 'Hỗ trợ khách hàng',
+      greeting: 'Xin chào! Tôi là chatbot của workspace.',
+      allowedOrigins: ['https://example.com'],
+      lang: 'vi',
+    },
+  })
+  @IsOptional()
+  widget_config?: Record<string, any>;
 }

@@ -42,6 +42,7 @@ const tools_module_1 = require("./modules/tools/tools.module");
 const knowledge_module_1 = require("./modules/knowledge/knowledge.module");
 const serve_static_1 = require("@nestjs/serve-static");
 const path_1 = require("path");
+const widget_module_1 = require("./modules/widget/widget.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -93,6 +94,7 @@ exports.AppModule = AppModule = __decorate([
             rag_module_1.RagModule,
             knowledge_module_1.KnowledgeModule,
             tools_module_1.ToolsModule,
+            widget_module_1.WidgetModule,
             custom_intents_module_1.CustomIntentsModule,
             custom_responses_module_1.CustomResponsesModule,
             training_data_module_1.TrainingDataModule,

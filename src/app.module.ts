@@ -33,6 +33,7 @@ import { ToolsModule } from './modules/tools/tools.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { WidgetModule } from './modules/widget/widget.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { join } from 'path';
     RagModule,
     KnowledgeModule,
     ToolsModule,
+    WidgetModule,
     CustomIntentsModule,
     CustomResponsesModule,
     TrainingDataModule,

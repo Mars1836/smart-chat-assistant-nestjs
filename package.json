@@ -21,6 +21,7 @@
     "seed": "tsx src/database/seeds/seed.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.38.0",
     "@google/generative-ai": "^0.24.1",
     "@langchain/community": "^1.1.4",
     "@langchain/core": "^1.1.15",
