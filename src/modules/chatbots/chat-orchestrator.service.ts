@@ -72,6 +72,12 @@ const ChatGraphState = Annotation.Root({
     reducer: (_left: number, right: number) => right,
     default: () => 5,
   }),
+
+  /** Content extracted from attached images by plugin (e.g. OCR); only this is sent to the main model, not image URLs */
+  extractedImageContent: Annotation<string>({
+    reducer: (_left: string, right: string) => right ?? '',
+    default: () => '',
+  }),
 });
 
 @Injectable()
@@ -98,10 +104,18 @@ export class ChatOrchestratorService {
         content: msg.content,
       }));
 
-      // Ensure last message is the current user message
+      // Ensure last message is the current user message; append plugin-extracted image content when present (images are processed by plugin, not sent to model)
       const last = mapped.at(-1);
+      let currentUserContent = state.userMessage;
+      if (state.extractedImageContent?.trim()) {
+        currentUserContent +=
+          '\n\n[Content from attached image(s)]: ' +
+          state.extractedImageContent.trim();
+      }
       if (!last || last.role !== 'user' || last.content !== state.userMessage) {
-        mapped.push({ role: 'user', content: state.userMessage });
+        mapped.push({ role: 'user', content: currentUserContent });
+      } else {
+        mapped[mapped.length - 1].content = currentUserContent;
       }
 
       return { geminiMessages: mapped };
@@ -312,9 +326,12 @@ export class ChatOrchestratorService {
     conversationId: string;
     userMessage: string;
     chatbot: Chatbot;
+    /** Content extracted from attached images by plugin (e.g. OCR); images are not sent to the main model */
+    extractedImageContent?: string;
   }): Promise<{ response: string; turns: number; files: any[] }> {
     const result = await this.graph.invoke({
       ...params,
+      extractedImageContent: params.extractedImageContent ?? '',
       systemInstruction: '',
       geminiMessages: [],
       tools: [],
@@ -347,6 +364,13 @@ export class ChatOrchestratorService {
 
     parts.push(
       'Hãy trả lời một cách ngắn gọn, rõ ràng và hữu ích. Nếu không chắc chắn, hãy thừa nhận và đề xuất cách khác.',
+    );
+
+    // Hướng dẫn riêng cho trường hợp có ảnh đính kèm đã được OCR trước ở backend
+    // (backend sẽ chèn thêm đoạn: "[Content from attached image(s)]:" + nội dung văn bản trích xuất)
+    parts.push(
+      'Nếu trong tin nhắn của người dùng có phần "[Content from attached image(s)]", hãy coi đó là văn bản đã được trích xuất từ ảnh đính kèm và sử dụng trực tiếp để trả lời. ' +
+        'Trong trường hợp này, KHÔNG được yêu cầu người dùng cung cấp URL của ảnh nữa và không cần gọi thêm công cụ OCR để đọc ảnh.',
     );
 
     return parts.join('\n');

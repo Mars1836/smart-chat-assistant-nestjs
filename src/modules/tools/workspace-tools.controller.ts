@@ -8,6 +8,7 @@ import {
   Put,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,6 +16,7 @@ import {
   ApiResponse,
   ApiTags,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ToolsService, ToolWithMeta } from './tools.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -53,8 +55,73 @@ export class WorkspaceToolsController {
   async getAvailableTools(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() user: any,
+    @Query('category') category?: 'builtin' | 'custom' | 'community',
+    @Query('search') search?: string,
+    @Query('installed') installed?: string,
+    @Query('sortBy')
+    sortBy: 'name' | 'category' | 'created_at' = 'name',
+    @Query('sortOrder')
+    sortOrder: 'asc' | 'desc' = 'asc',
   ): Promise<ToolWithMeta[]> {
-    return this.toolsService.findAllByWorkspaceWithAuth(workspaceId, user?.sub);
+    let tools = await this.toolsService.findAllByWorkspaceWithAuth(
+      workspaceId,
+      user?.sub,
+    );
+
+    // Filter by category
+    if (category) {
+      tools = tools.filter((t) => t.category === category);
+    }
+
+    // Filter by installed flag (true/false)
+    if (installed !== undefined) {
+      const isInstalled =
+        installed === 'true' || installed === '1' || installed === 'yes';
+      tools = tools.filter((t) =>
+        isInstalled ? !!t.workspace_tool : !t.workspace_tool,
+      );
+    }
+
+    // Text search by name / display_name / description
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      tools = tools.filter((t) => {
+        const name = t.name?.toLowerCase?.() || '';
+        const display = t.display_name?.toLowerCase?.() || '';
+        const desc = t.description?.toLowerCase?.() || '';
+        return (
+          name.includes(q) ||
+          display.includes(q) ||
+          desc.includes(q)
+        );
+      });
+    }
+
+    // Sorting
+    tools.sort((a, b) => {
+      let av: any;
+      let bv: any;
+      switch (sortBy) {
+        case 'category':
+          av = a.category || '';
+          bv = b.category || '';
+          break;
+        case 'created_at':
+          av = (a as any).created_at || '';
+          bv = (b as any).created_at || '';
+          break;
+        case 'name':
+        default:
+          av = a.display_name || a.name || '';
+          bv = b.display_name || b.name || '';
+          break;
+      }
+      if (av < bv) return sortOrder === 'desc' ? 1 : -1;
+      if (av > bv) return sortOrder === 'desc' ? -1 : 1;
+      return 0;
+    });
+
+    return tools;
   }
 
   @Get('installed')
@@ -71,8 +138,63 @@ export class WorkspaceToolsController {
   async getInstalledTools(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() user: any,
+    @Query('category') category?: 'builtin' | 'custom' | 'community',
+    @Query('search') search?: string,
+    @Query('sortBy')
+    sortBy: 'name' | 'category' | 'created_at' = 'name',
+    @Query('sortOrder')
+    sortOrder: 'asc' | 'desc' = 'asc',
   ): Promise<ToolWithMeta[]> {
-    return this.toolsService.findWorkspaceInstalledTools(workspaceId, user?.sub);
+    let tools = await this.toolsService.findWorkspaceInstalledTools(
+      workspaceId,
+      user?.sub,
+    );
+
+    // Filter by category
+    if (category) {
+      tools = tools.filter((t) => t.category === category);
+    }
+
+    // Text search by name / display_name / description
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      tools = tools.filter((t) => {
+        const name = t.name?.toLowerCase?.() || '';
+        const display = t.display_name?.toLowerCase?.() || '';
+        const desc = t.description?.toLowerCase?.() || '';
+        return (
+          name.includes(q) ||
+          display.includes(q) ||
+          desc.includes(q)
+        );
+      });
+    }
+
+    // Sorting
+    tools.sort((a, b) => {
+      let av: any;
+      let bv: any;
+      switch (sortBy) {
+        case 'category':
+          av = a.category || '';
+          bv = b.category || '';
+          break;
+        case 'created_at':
+          av = (a as any).created_at || '';
+          bv = (b as any).created_at || '';
+          break;
+        case 'name':
+        default:
+          av = a.display_name || a.name || '';
+          bv = b.display_name || b.name || '';
+          break;
+      }
+      if (av < bv) return sortOrder === 'desc' ? 1 : -1;
+      if (av > bv) return sortOrder === 'desc' ? -1 : 1;
+      return 0;
+    });
+
+    return tools;
   }
 
   @Post('custom')
@@ -175,5 +297,27 @@ export class WorkspaceToolsController {
     @Param('toolId') toolId: string,
   ): Promise<void> {
     await this.workspaceToolsService.removeWorkspaceTool(workspaceId, toolId);
+  }
+
+  @Delete('custom/:toolId')
+  @ApiOperation({
+    summary: 'Xóa hẳn custom plugin của workspace',
+    description:
+      'Chỉ áp dụng cho custom tools (category=custom, is_public=false) được tạo bởi workspace này. ' +
+      'Kiểm tra quyền WORKSPACE_MANAGE_PLUGINS và người tạo plugin.',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Custom plugin deleted successfully',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_MANAGE_PLUGINS)
+  async deleteCustomTool(
+    @Param('workspaceId') workspaceId: string,
+    @Param('toolId') toolId: string,
+    @CurrentUser() user: any,
+  ): Promise<void> {
+    // user.sub là ID user từ JWT (tuỳ bạn map), fallback sang user.id nếu cần
+    const userId = user?.sub ?? user?.id;
+    await this.workspaceToolsService.deleteCustomTool(workspaceId, toolId, userId);
   }
 }

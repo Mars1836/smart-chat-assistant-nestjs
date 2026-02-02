@@ -4,12 +4,16 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Chatbot } from './entities/chatbot.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
+import { MessageAttachment } from '../messages/entities/message-attachment.entity';
 import { CreateChatbotDto, UpdateChatbotDto, ChatDto } from './dto';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagService } from '../rag/rag.service';
@@ -33,11 +37,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
+    @InjectRepository(MessageAttachment)
+    private readonly attachmentRepo: Repository<MessageAttachment>,
     private readonly aiStudioService: GeminiProvider,
     private readonly ragService: RagService,
     private readonly toolRegistryService: ToolRegistryService,
     private readonly toolExecutorService: ToolExecutorService,
     private readonly chatOrchestrator: ChatOrchestratorService,
+    private readonly configService: ConfigService,
   ) {
     super();
   }
@@ -166,6 +173,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     response: string;
     model: string;
     files: any[];
+    uploaded_images: any[];
     processingTime: number;
   }> {
     const startTime = Date.now();
@@ -195,9 +203,52 @@ export class ChatbotsService extends BaseService<Chatbot> {
       sender: { id: userId } as any,
       content: chatDto.message,
     });
-    await this.messageRepo.save(userMessage);
+    const savedUserMessage = await this.messageRepo.save(userMessage);
+
+    // Save uploaded images as attachments
+    const uploadedImages: any[] = [];
+    if (chatDto.images && chatDto.images.length > 0) {
+      const savedAttachments = await this.saveUploadedImages(
+        workspaceId,
+        savedUserMessage.id,
+        chatDto.images,
+      );
+      uploadedImages.push(...savedAttachments);
+    }
 
     try {
+      let extractedImageContent: string | undefined;
+      if (uploadedImages.length > 0) {
+        const appUrl =
+          this.configService.get<string>('APP_URL') ?? 'http://localhost:4000';
+        const imageUrls = uploadedImages.map(
+          (att: { url: string }) =>
+            `${appUrl.replace(/\/$/, '')}${att.url.startsWith('/') ? att.url : '/' + att.url}`,
+        );
+        const ctx = {
+          workspaceId,
+          userId,
+          sessionId: chatDto.conversation_id,
+          chatbotId,
+        };
+        const texts: string[] = [];
+        for (const url of imageUrls) {
+          try {
+            const result = await this.toolExecutorService.execute(
+              'ocr',
+              { imageUrl: url },
+              ctx,
+            );
+            if (result?.text) texts.push(String(result.text).trim());
+          } catch (err) {
+            this.logger.warn(`OCR failed for image ${url}:`, err);
+          }
+        }
+        if (texts.length > 0) {
+          extractedImageContent = texts.join('\n\n---\n\n');
+        }
+      }
+
       const { response: finalResponseText, files } =
         await this.chatOrchestrator.runChatTurn({
           workspaceId,
@@ -206,6 +257,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
           conversationId: chatDto.conversation_id,
           userMessage: chatDto.message,
           chatbot,
+          extractedImageContent,
         });
 
       // Lưu tin nhắn bot vào database
@@ -243,6 +295,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         response: finalResponseText,
         model: chatbot.llm_model,
         files: responseFiles,
+        uploaded_images: uploadedImages,
         processingTime,
       };
     } catch (error) {
@@ -266,9 +319,67 @@ export class ChatbotsService extends BaseService<Chatbot> {
         response: fallbackResponse,
         model: chatbot.llm_model,
         files: [],
+        uploaded_images: uploadedImages,
         processingTime: Date.now() - startTime,
       };
     }
+  }
+
+  /**
+   * Save uploaded images to disk and database
+   */
+  private async saveUploadedImages(
+    workspaceId: string,
+    messageId: string,
+    files: Express.Multer.File[],
+  ): Promise<any[]> {
+    const savedAttachments: any[] = [];
+
+    // Create upload directory
+    const uploadsDir = path.join(
+      process.cwd(),
+      'uploads',
+      'chat-images',
+      workspaceId,
+    );
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    for (const file of files) {
+      // Generate unique filename
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname);
+      const uniqueName = `${timestamp}-${Math.random().toString(36).substring(7)}${ext}`;
+      const filePath = path.join(uploadsDir, uniqueName);
+
+      // Save file to disk
+      fs.writeFileSync(filePath, file.buffer);
+
+      // Create attachment record
+      const attachment = this.attachmentRepo.create({
+        message_id: messageId,
+        type: 'image',
+        url: `/uploads/chat-images/${workspaceId}/${uniqueName}`,
+        filename: file.originalname,
+        mime_type: file.mimetype,
+        size: file.size,
+      });
+
+      const savedAttachment = await this.attachmentRepo.save(attachment);
+
+      savedAttachments.push({
+        id: savedAttachment.id,
+        url: savedAttachment.url,
+        filename: savedAttachment.filename,
+        mime_type: savedAttachment.mime_type,
+        size: savedAttachment.size,
+      });
+
+      this.logger.log(`Saved chat image: ${savedAttachment.url}`);
+    }
+
+    return savedAttachments;
   }
 
   /**

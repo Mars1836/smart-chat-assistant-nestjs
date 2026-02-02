@@ -435,6 +435,68 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
     },
 
     // =====================
+    // GOOGLE SEARCH (SerpApi - thay thế CSE)
+    // =====================
+    // Requires: SERPAPI_API_KEY in .env
+    // Đăng ký API key tại: https://serpapi.com/
+    {
+      name: 'google_search',
+      display_name: 'Google Search',
+      description:
+        'Tìm kiếm trên web qua Google (SerpApi). Chỉ cần cấu hình SERPAPI_API_KEY.',
+      category: 'builtin',
+      is_enabled: true,
+      executor_type: 'generic_api',
+      executor_config: {
+        base_url: 'https://serpapi.com/search',
+      },
+      auth_config: {
+        type: 'api_key',
+        api_key: {
+          param_type: 'query',
+          param_name: 'api_key',
+          value: process.env.SERPAPI_API_KEY,
+        },
+      },
+      actions: [
+        {
+          name: 'search',
+          display_name: 'Search',
+          description:
+            'Tìm kiếm thông tin trên web. Trả về tiêu đề, snippet và link của các kết quả tìm kiếm.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'Từ khóa hoặc câu hỏi cần tìm kiếm',
+              },
+              num: {
+                type: 'number',
+                description: 'Số kết quả trả về (mặc định 5)',
+                default: 5,
+              },
+            },
+            required: ['query'],
+          },
+          executor_config: {
+            method: 'GET',
+            endpoint: '',
+            params: {
+              query: {
+                engine: 'google',
+                q: '{{query}}',
+                num: '{{num}}',
+              },
+            },
+            response_transform: 'organic_results',
+          },
+          sort_order: 0,
+        },
+      ],
+    },
+
+    // =====================
     // EXCEL GENERATOR (Function)
     // =====================
     // =====================
@@ -481,6 +543,44 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
           },
           executor_config: {
             function: 'generate_excel',
+          },
+          sort_order: 0,
+        },
+      ],
+    },
+
+    // =====================
+    // OCR (Function - Gemini Vision)
+    // =====================
+    {
+      name: 'ocr',
+      display_name: 'OCR - Nhận dạng văn bản từ ảnh',
+      description:
+        'Trích xuất văn bản từ hình ảnh (OCR) sử dụng Gemini Vision. Hỗ trợ ảnh từ URL công khai.',
+      category: 'builtin',
+      is_enabled: true,
+      executor_type: 'function',
+      executor_config: {},
+      auth_config: { type: 'none' },
+      actions: [
+        {
+          name: 'extract_text',
+          display_name: 'Extract Text',
+          description:
+            'Trích xuất toàn bộ văn bản từ hình ảnh. Truyền URL công khai của ảnh (jpg, png, webp, gif). Ví dụ: https://example.com/image.jpg',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              imageUrl: {
+                type: 'string',
+                description:
+                  'URL công khai của hình ảnh cần OCR (ví dụ: https://file.example.com/image.jpg)',
+              },
+            },
+            required: ['imageUrl'],
+          },
+          executor_config: {
+            function: 'ocr_extract_text',
           },
           sort_order: 0,
         },

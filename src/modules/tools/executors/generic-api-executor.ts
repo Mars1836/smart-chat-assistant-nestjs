@@ -136,6 +136,9 @@ export class GenericApiExecutor extends BaseToolExecutor {
       processedParams._injectedQueryAuth = params._injectedQueryAuth;
     }
 
+    // Expose tool executor config for substitution (e.g. {{_config.cx}} for Google CSE)
+    processedParams._config = this.config;
+
     // Build URL with path parameter substitution
     endpoint = this.substitutePathParams(
       endpoint,
@@ -143,7 +146,10 @@ export class GenericApiExecutor extends BaseToolExecutor {
       processedParams,
     );
 
-    const url = `${baseUrl}${endpoint}`;
+    // If endpoint is absolute (starts with http/https), use it as-is.
+    // Otherwise, prefix with base_url from tool.executor_config.
+    const isAbsoluteUrl = /^https?:\/\//i.test(endpoint);
+    const url = isAbsoluteUrl ? endpoint : `${baseUrl}${endpoint}`;
 
     // Build query string
     const queryString = this.buildQueryString(

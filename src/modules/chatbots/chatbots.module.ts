@@ -6,6 +6,7 @@ import { Chatbot } from './entities/chatbot.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
+import { MessageAttachment } from '../messages/entities/message-attachment.entity';
 import { ChatbotsController } from './chatbots.controller';
 import { ChatbotsService } from './chatbots.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
@@ -18,7 +19,7 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Chatbot, Workspace, Conversation, Message]),
+    TypeOrmModule.forFeature([Chatbot, Workspace, Conversation, Message, MessageAttachment]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

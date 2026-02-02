@@ -11,6 +11,7 @@ import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { OpenAIProvider } from '../../common/providers/openai.provider';
 import { WidgetController } from './widget.controller';
 import { WidgetService } from './widget.service';
+import { WidgetChatOrchestratorService } from './widget-chat-orchestrator.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { WidgetService } from './widget.service';
   controllers: [WidgetController],
   providers: [
     WidgetService,
+    WidgetChatOrchestratorService,
     // LLM providers (riêng cho widget)
     LLMFactoryService,
     GeminiProvider,

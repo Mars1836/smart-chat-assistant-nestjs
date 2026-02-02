@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, IsUUID, IsOptional } from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({
@@ -17,6 +17,27 @@ export class ChatDto {
   @IsUUID()
   @IsNotEmpty()
   conversation_id: string;
+
+  // Images will be populated by controller from multipart/form-data
+  @IsOptional()
+  images?: Express.Multer.File[];
+}
+
+export class UploadedImageDto {
+  @ApiProperty({ description: 'ID của attachment' })
+  id: string;
+
+  @ApiProperty({ description: 'URL của ảnh', example: '/uploads/chat-images/workspace-id/image.jpg' })
+  url: string;
+
+  @ApiProperty({ description: 'Tên file', example: 'image.jpg' })
+  filename: string;
+
+  @ApiPropertyOptional({ description: 'MIME type', example: 'image/jpeg' })
+  mime_type?: string;
+
+  @ApiPropertyOptional({ description: 'Kích thước file (bytes)', example: 102400 })
+  size?: number;
 }
 
 export class ChatResponseDto {
@@ -38,8 +59,11 @@ export class ChatResponseDto {
   })
   model: string;
 
-  @ApiProperty({ required: false, type: [Object] })
+  @ApiProperty({ required: false, type: [Object], description: 'Files từ tools (bot response)' })
   files?: any[];
+
+  @ApiProperty({ required: false, type: [UploadedImageDto], description: 'Ảnh user đã upload' })
+  uploaded_images?: UploadedImageDto[];
 
   @ApiProperty({
     description: 'Thời gian xử lý (ms)',

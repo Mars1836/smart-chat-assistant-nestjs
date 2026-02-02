@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   Query,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +19,10 @@ import {
   ApiExtraModels,
   ApiBearerAuth,
   getSchemaPath,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ChatbotsService } from './chatbots.service';
 import {
   CreateChatbotDto,
@@ -175,7 +180,32 @@ export class ChatbotsController {
   }
 
   @Post(':id/chat')
-  @ApiOperation({ summary: 'Chat với chatbot' })
+  @UseInterceptors(FilesInterceptor('images', 5, {
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per file
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new Error('Only image files are allowed'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  @ApiOperation({ summary: 'Chat với chatbot (hỗ trợ gửi ảnh)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Tin nhắn của user' },
+        conversation_id: { type: 'string', format: 'uuid', description: 'ID của conversation' },
+        images: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Ảnh đính kèm (tối đa 5 ảnh, mỗi ảnh max 10MB)',
+        },
+      },
+      required: ['message', 'conversation_id'],
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Chat response',
@@ -188,7 +218,10 @@ export class ChatbotsController {
     @Param('id') id: string,
     @User('sub') userId: string,
     @Body() chatDto: ChatDto,
+    @UploadedFiles() images: Express.Multer.File[],
   ) {
+    // Attach uploaded images to DTO
+    chatDto.images = images || [];
     return this.chatbotsService.chat(workspaceId, id, userId, chatDto);
   }
 

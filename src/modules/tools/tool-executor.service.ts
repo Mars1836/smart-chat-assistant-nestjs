@@ -10,7 +10,7 @@ import { FunctionExecutor } from './executors/function-executor';
 import { GenericApiExecutor } from './executors/generic-api-executor';
 import { RagService } from '../rag/rag.service';
 import { OAuthService } from './oauth.service';
-
+import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { FileCleanupProducer } from './file-cleanup/file-cleanup.producer';
 
 @Injectable()
@@ -28,6 +28,7 @@ export class ToolExecutorService {
     private readonly ragService: RagService,
     private readonly oauthService: OAuthService,
     private readonly fileCleanupProducer: FileCleanupProducer,
+    private readonly geminiProvider: GeminiProvider,
   ) {}
 
   /**
@@ -132,7 +133,11 @@ export class ToolExecutorService {
           break;
 
         case 'function':
-          executor = new FunctionExecutor(tool.executor_config, this.fileCleanupProducer);
+          executor = new FunctionExecutor(
+            tool.executor_config,
+            this.fileCleanupProducer,
+            this.geminiProvider,
+          );
           break;
 
         // Generic API executor handles all API types

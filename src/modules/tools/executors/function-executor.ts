@@ -1,12 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { BaseToolExecutor, ExecutionContext } from './base-executor';
 import { FileCleanupProducer } from '../file-cleanup/file-cleanup.producer';
+import { GeminiProvider } from '../../../common/providers/gemini.provider';
+
+// Map URL extension to MIME type for OCR
+const EXT_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+};
 
 @Injectable()
 export class FunctionExecutor extends BaseToolExecutor {
   constructor(
     config: Record<string, any>,
     private readonly fileCleanupProducer?: FileCleanupProducer,
+    private readonly geminiProvider?: GeminiProvider,
   ) {
     super(config);
   }
@@ -105,6 +116,29 @@ export class FunctionExecutor extends BaseToolExecutor {
         url: `/uploads/temp/${safeFilename}`, // Suggesting a URL pattern
         message: `Excel file created: ${safeFilename} (will be deleted in 5 minutes)`
       };
+    },
+
+    ocr_extract_text: async (params: any) => {
+      const gemini = this.geminiProvider;
+      if (!gemini) {
+        throw new Error('OCR tool requires Gemini provider. Please configure GOOGLE_AI_STUDIO_API_KEY.');
+      }
+      const imageUrl = params?.imageUrl;
+      if (!imageUrl || typeof imageUrl !== 'string') {
+        throw new Error('imageUrl is required (public URL of the image)');
+      }
+      const res = await fetch(imageUrl, { method: 'GET' });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      let mime = res.headers.get('content-type')?.split(';')[0]?.trim();
+      if (!mime || !mime.startsWith('image/')) {
+        const ext = (imageUrl.split('.').pop() || '').split('?')[0].toLowerCase();
+        mime = EXT_TO_MIME[ext] || 'image/jpeg';
+      }
+      const text = await gemini.extractFromImage(buf, mime);
+      return { text, success: true };
     },
 
   };

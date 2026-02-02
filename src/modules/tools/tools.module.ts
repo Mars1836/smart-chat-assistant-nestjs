@@ -22,6 +22,7 @@ import { OAuthService } from './oauth.service';
 import { RagModule } from '../rag/rag.module';
 import { AuthModule } from '../auth/auth.module';
 import { FileCleanupModule } from './file-cleanup/file-cleanup.module';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { FileCleanupModule } from './file-cleanup/file-cleanup.module';
     ToolsService,
     WorkspaceToolsService,
     OAuthService,
+    GeminiProvider, // For OCR (ocr_extract_text) and other vision-based tools
   ],
   exports: [
     ToolRegistryService,

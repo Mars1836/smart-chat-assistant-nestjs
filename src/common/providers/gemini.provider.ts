@@ -69,16 +69,23 @@ export class GeminiProvider implements ILLMProvider {
         });
       }
 
-      // 2. Map messages
+      // 2. Map messages (Gemini API only accepts role 'user' or 'model'; function response goes as 'user')
       for (const msg of messages) {
         if (msg.role === 'function' && msg.functionResponse) {
+          // Gemini expects response to be an object (Struct), not an array or primitive
+          const raw = msg.functionResponse.response;
+          const response =
+            raw !== null && typeof raw === 'object' && !Array.isArray(raw)
+              ? raw
+              : { result: raw };
+
           geminiMessages.push({
-            role: 'function',
+            role: 'user',
             parts: [
               {
                 functionResponse: {
                   name: msg.functionResponse.name,
-                  response: msg.functionResponse.response,
+                  response,
                 },
               },
             ],
@@ -93,18 +100,23 @@ export class GeminiProvider implements ILLMProvider {
                 args: msg.functionCall.args,
               },
             });
-
-          geminiMessages.push({
-            role: 'model',
-            parts,
-          });
+          if (parts.length > 0) {
+            geminiMessages.push({ role: 'model', parts });
+          }
         } else {
-          // USER or SYSTEM (mapped to user for Gemini if passed here)
+          // USER or SYSTEM: must have at least one non-empty part (Gemini rejects empty parts)
+          const text = (msg.content && String(msg.content).trim()) || ' ';
           geminiMessages.push({
             role: 'user',
-            parts: [{ text: msg.content || '' }],
+            parts: [{ text }],
           });
         }
+      }
+
+      if (geminiMessages.length === 0) {
+        throw new Error(
+          'Gemini API requires at least one content with parts. No valid messages to send.',
+        );
       }
 
       const requestBody: any = {

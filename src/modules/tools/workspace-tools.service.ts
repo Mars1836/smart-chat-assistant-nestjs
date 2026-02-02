@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -142,5 +143,56 @@ export class WorkspaceToolsService {
     });
 
     return this.workspaceToolRepo.save(workspaceTool);
+  }
+
+  /**
+   * Hard-delete a custom tool (plugin) that was created for a specific workspace.
+   * - Only works for tools with category='custom' and is_public=false
+   * - Only the creator (or someone acting as that user) can delete it
+   * - Tool must not be installed in any other workspace
+   */
+  async deleteCustomTool(
+    workspaceId: string,
+    toolId: string,
+    userId: string,
+  ): Promise<void> {
+    const tool = await this.toolRepo.findOne({ where: { id: toolId } });
+    if (!tool) {
+      throw new NotFoundException('Tool not found');
+    }
+
+    if (tool.category !== 'custom' || tool.is_public) {
+      throw new BadRequestException(
+        'Only private custom tools can be hard-deleted',
+      );
+    }
+
+    if (tool.created_by_id && tool.created_by_id !== userId) {
+      throw new ForbiddenException(
+        'You are not allowed to delete this custom tool',
+      );
+    }
+
+    // Ensure this tool is only installed in the given workspace
+    const allWorkspaceTools = await this.workspaceToolRepo.find({
+      where: { tool_id: toolId },
+    });
+    if (
+      allWorkspaceTools.length > 0 &&
+      allWorkspaceTools.some((wt) => wt.workspace_id !== workspaceId)
+    ) {
+      throw new BadRequestException(
+        'This tool is installed in other workspaces and cannot be deleted',
+      );
+    }
+
+    // First, remove from workspace (cleans up chatbot_tool and chatbot_tool_action)
+    const existing = await this.findOne(workspaceId, toolId);
+    if (existing) {
+      await this.removeWorkspaceTool(workspaceId, toolId);
+    }
+
+    // Finally, delete the Tool entity itself (actions are removed via CASCADE)
+    await this.toolRepo.remove(tool);
   }
 }
