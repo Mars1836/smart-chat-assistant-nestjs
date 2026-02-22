@@ -361,7 +361,6 @@ export class ChatOrchestratorService {
     if (chatbot.greeting_message) {
       parts.push(`Tin nhắn chào: "${chatbot.greeting_message}"`);
     }
-
     parts.push(
       'Hãy trả lời một cách ngắn gọn, rõ ràng và hữu ích. Nếu không chắc chắn, hãy thừa nhận và đề xuất cách khác.',
     );
