@@ -41,9 +41,17 @@ export class DocumentProcessingProcessor extends WorkerHost {
       // 2. Extract
       const text = await this.parsingService.extractText(absolutePath, mimetype);
       await this.updateProgress(documentId, 30, 'Đang chia nhỏ văn bản...');
-      
-      // 3. Chunk
-      const chunks = await this.parsingService.chunkText(text);
+
+      // 3. Chunk (CSV: mỗi dòng context = 1 chunk; các loại khác: split theo kích thước)
+      let chunks: string[];
+      if (mimetype === 'text/csv' || mimetype === 'csv') {
+        chunks = text
+          .split(/\n\n---\n\n/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+      } else {
+        chunks = await this.parsingService.chunkText(text);
+      }
       await this.documentRepo.update(documentId, { chunk_count: chunks.length });
       await this.updateProgress(documentId, 40, `Đã chia thành ${chunks.length} đoạn. Đang tạo vector...`);
 

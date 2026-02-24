@@ -8,9 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { WorkspaceTool } from './entities/workspace-tool.entity';
 import { Tool } from './entities/tool.entity';
+import { ToolAction } from './entities/tool-action.entity';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
 import { ChatbotTool } from './entities/chatbot-tool.entity';
 import { ChatbotToolAction } from './entities/chatbot-tool-action.entity';
+import { ToolExecutionLog } from './entities/tool-execution-log.entity';
 import { AddWorkspaceToolDto } from './dto/add-workspace-tool.dto';
 import { UpdateWorkspaceToolDto } from './dto/update-workspace-tool.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
@@ -22,12 +24,16 @@ export class WorkspaceToolsService {
     private readonly workspaceToolRepo: Repository<WorkspaceTool>,
     @InjectRepository(Tool)
     private readonly toolRepo: Repository<Tool>,
+    @InjectRepository(ToolAction)
+    private readonly toolActionRepo: Repository<ToolAction>,
     @InjectRepository(Chatbot)
     private readonly chatbotRepo: Repository<Chatbot>,
     @InjectRepository(ChatbotTool)
     private readonly chatbotToolRepo: Repository<ChatbotTool>,
     @InjectRepository(ChatbotToolAction)
     private readonly chatbotToolActionRepo: Repository<ChatbotToolAction>,
+    @InjectRepository(ToolExecutionLog)
+    private readonly toolExecutionLogRepo: Repository<ToolExecutionLog>,
   ) {}
 
   async findByWorkspace(workspaceId: string): Promise<WorkspaceTool[]> {
@@ -123,14 +129,41 @@ export class WorkspaceToolsService {
     dto: CreateToolDto,
     userId: string,
   ): Promise<WorkspaceTool> {
-    // 1. Create Tool (Force category='custom')
+    const existing = await this.toolRepo.findOne({ where: { name: dto.name } });
+    if (existing) {
+      throw new BadRequestException(
+        `A tool with name "${dto.name}" already exists. Use a different name or delete the existing tool first.`,
+      );
+    }
+
+    const { actions, ...toolData } = dto;
+
+    // 1. Create Tool (Force category='custom'), không spread actions để lưu thủ công kèm card_config
     const tool = this.toolRepo.create({
-      ...dto,
+      ...toolData,
       category: 'custom',
-      is_public: false, // Custom tools are private to workspace
+      is_public: false,
       created_by_id: userId,
     });
     const savedTool = await this.toolRepo.save(tool);
+
+    // 1b. Tạo từng action (có card_config) để cards hoạt động
+    if (actions && actions.length > 0) {
+      for (const actionDto of actions) {
+        const action = this.toolActionRepo.create({
+          tool_id: savedTool.id,
+          name: actionDto.name,
+          display_name: actionDto.display_name,
+          description: actionDto.description,
+          parameters: actionDto.parameters ?? {},
+          executor_config: actionDto.executor_config ?? null,
+          sort_order: actionDto.sort_order ?? 0,
+          is_enabled: actionDto.is_enabled ?? true,
+          card_config: actionDto.card_config ?? null,
+        });
+        await this.toolActionRepo.save(action);
+      }
+    }
 
     // 2. Add to Workspace
     const workspaceTool = this.workspaceToolRepo.create({
@@ -191,6 +224,9 @@ export class WorkspaceToolsService {
     if (existing) {
       await this.removeWorkspaceTool(workspaceId, toolId);
     }
+
+    // Delete execution logs that reference this tool (FK constraint)
+    await this.toolExecutionLogRepo.delete({ tool_id: toolId });
 
     // Finally, delete the Tool entity itself (actions are removed via CASCADE)
     await this.toolRepo.remove(tool);

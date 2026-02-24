@@ -174,6 +174,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     model: string;
     files: any[];
     uploaded_images: any[];
+    cards: any[];
     processingTime: number;
   }> {
     const startTime = Date.now();
@@ -249,7 +250,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         }
       }
 
-      const { response: finalResponseText, files } =
+      const { response: finalResponseText, files, cards } =
         await this.chatOrchestrator.runChatTurn({
           workspaceId,
           chatbotId,
@@ -296,6 +297,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         model: chatbot.llm_model,
         files: responseFiles,
         uploaded_images: uploadedImages,
+        cards: cards || [],
         processingTime,
       };
     } catch (error) {
@@ -320,6 +322,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         model: chatbot.llm_model,
         files: [],
         uploaded_images: uploadedImages,
+        cards: [],
         processingTime: Date.now() - startTime,
       };
     }

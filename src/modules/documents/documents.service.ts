@@ -314,6 +314,8 @@ export class DocumentsService extends BaseService<Document> {
       doc: 'application/msword',
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       txt: 'text/plain',
+      md: 'text/markdown',
+      csv: 'text/csv',
       jpg: 'image/jpeg',
       jpeg: 'image/jpeg',
       png: 'image/png',

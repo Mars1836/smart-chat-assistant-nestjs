@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Tool } from './entities/tool.entity';
 import { ToolAction } from './entities/tool-action.entity';
 import { WorkspaceTool } from './entities/workspace-tool.entity';
@@ -78,22 +78,28 @@ export class ToolsService {
     workspaceId: string,
     userId?: string,
   ): Promise<ToolWithMeta[]> {
-    // Builtin tools + all custom tools (custom tools are shared across workspaces)
-    const tools = await this.toolRepo.find({
-      where: [
-        { category: 'builtin', is_enabled: true },
-        { category: 'custom', is_enabled: true },
-      ],
-      relations: ['actions'],
-      order: { category: 'ASC', name: 'ASC' },
-    });
-
-    // Get workspace tool metadata
+    // Get workspace tool metadata first (installed tool_ids for this workspace)
     const workspaceTools = await this.workspaceToolRepo.find({
       where: { workspace_id: workspaceId },
     });
     const wsToolMap = new Map<string, WorkspaceTool>();
     workspaceTools.forEach((wt) => wsToolMap.set(wt.tool_id, wt));
+    const installedToolIds = workspaceTools.map((wt) => wt.tool_id);
+
+    // Builtin tools (all) + custom tools CHỈ khi đã cài vào workspace (không hiện custom chưa cài)
+    const whereConditions: any[] = [{ category: 'builtin', is_enabled: true }];
+    if (installedToolIds.length > 0) {
+      whereConditions.push({
+        category: 'custom',
+        is_enabled: true,
+        id: In(installedToolIds),
+      });
+    }
+    const tools = await this.toolRepo.find({
+      where: whereConditions,
+      relations: ['actions'],
+      order: { category: 'ASC', name: 'ASC' },
+    });
 
     // Get user OAuth credentials if userId provided
     let userCredMap = new Map<string, UserToolCredential>();
@@ -245,6 +251,7 @@ export class ToolsService {
           executor_config: actionDto.executor_config || null,
           sort_order: actionDto.sort_order || 0,
           is_enabled: actionDto.is_enabled ?? true,
+          card_config: actionDto.card_config ?? null,
         });
         await this.toolActionRepo.save(action);
       }
@@ -278,6 +285,7 @@ export class ToolsService {
           executor_config: actionDto.executor_config || null,
           sort_order: actionDto.sort_order || 0,
           is_enabled: actionDto.is_enabled ?? true,
+          card_config: actionDto.card_config ?? null,
         });
         await this.toolActionRepo.save(action);
       }
@@ -322,6 +330,7 @@ export class ToolsService {
       executor_config: dto.executor_config || null,
       sort_order: dto.sort_order || 0,
       is_enabled: dto.is_enabled ?? true,
+      card_config: dto.card_config ?? null,
     });
 
     return this.toolActionRepo.save(action);

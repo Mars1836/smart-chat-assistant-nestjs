@@ -65,6 +65,23 @@ export class ChatResponseDto {
   @ApiProperty({ required: false, type: [UploadedImageDto], description: 'Ảnh user đã upload' })
   uploaded_images?: UploadedImageDto[];
 
+  @ApiPropertyOptional({
+    description: 'Cards chung (product | article | link): title, description?, imageUrl?, url (link khi bấm), metadata? (giá, brand, author, ...). FE render một kiểu card cho mọi type.',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['product', 'article', 'link'] },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        imageUrl: { type: 'string' },
+        url: { type: 'string' },
+        metadata: { type: 'object' },
+      },
+    },
+  })
+  cards?: any[];
+
   @ApiProperty({
     description: 'Thời gian xử lý (ms)',
     example: 1234,

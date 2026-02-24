@@ -5,6 +5,59 @@ import * as mammoth from 'mammoth';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { GeminiProvider } from '../../../common/providers/gemini.provider';
 
+/** Parse CSV có cột "context" (hoặc cột đầu). Hỗ trợ field trong ngoặc kép, có thể chứa newline. */
+function parseCsvContexts(content: string): string[] {
+  const rows: string[][] = [];
+  let i = 0;
+  const len = content.length;
+  const peek = () => content[i];
+  const next = () => content[++i];
+  while (i < len) {
+    const row: string[] = [];
+    while (i < len) {
+      const c = peek();
+      if (c === '\r' || c === '\n') {
+        next();
+        if (c === '\r' && peek() === '\n') next();
+        break;
+      }
+      if (c === '"') {
+        next();
+        let field = '';
+        while (i < len) {
+          const ch = peek();
+          if (ch === '"') {
+            next();
+            if (peek() === '"') {
+              field += '"';
+              next();
+            } else break;
+          } else {
+            field += ch;
+            next();
+          }
+        }
+        row.push(field.trim());
+        if (peek() === ',') next();
+      } else {
+        let field = '';
+        while (i < len && peek() !== ',' && peek() !== '\r' && peek() !== '\n') {
+          field += peek();
+          next();
+        }
+        row.push(field.trim());
+        if (peek() === ',') next();
+      }
+    }
+    if (row.some((c) => c.length > 0)) rows.push(row);
+  }
+  if (rows.length === 0) return [];
+  const header = rows[0].map((h) => h.toLowerCase());
+  const contextIdx = header.findIndex((h) => h === 'context');
+  const colIdx = contextIdx >= 0 ? contextIdx : 0;
+  return rows.slice(1).map((r) => r[colIdx] || '').filter((s) => s.trim() !== '');
+}
+
 // Supported image MIME types (full + extensions)
 const IMAGE_MIME_TYPES = [
   'image/png',
@@ -24,6 +77,7 @@ const EXTENSION_TO_MIME: Record<string, string> = {
   pdf: 'application/pdf',
   txt: 'text/plain',
   md: 'text/markdown',
+  csv: 'text/csv',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   doc: 'application/msword',
 };
@@ -89,6 +143,13 @@ export class DocumentParsingService {
         normalizedMime === 'text/markdown'
       ) {
         return buffer.toString('utf-8');
+      }
+
+      // CSV: lấy cột "context" (hoặc cột đầu tiên) làm nội dung knowledge
+      if (normalizedMime === 'text/csv') {
+        const text = buffer.toString('utf-8');
+         const contexts = parseCsvContexts(text);
+        return contexts.join('\n\n---\n\n');
       }
 
       // Images - Use Gemini Vision for OCR/description

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
@@ -11,6 +12,7 @@ import { ToolRegistryService } from '../tools/tool-registry.service';
 import { ToolExecutorService } from '../tools/tool-executor.service';
 import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { LLMMessage } from '../../common/interfaces/llm-provider.interface';
+import { buildCardsFromToolResults } from './card-mappers';
 
 type GeminiMessage = {
   role: 'user' | 'assistant' | 'function';
@@ -77,6 +79,12 @@ const ChatGraphState = Annotation.Root({
   extractedImageContent: Annotation<string>({
     reducer: (_left: string, right: string) => right ?? '',
     default: () => '',
+  }),
+
+  /** Cards chung (product / article / link) từ tool để FE render card có ảnh + link */
+  cards: Annotation<any[]>({
+    reducer: (_left: any[], right: any[]) => (Array.isArray(right) ? right : []),
+    default: () => [],
   }),
 });
 
@@ -272,10 +280,29 @@ export class ChatOrchestratorService {
         },
       }));
 
+      // Card: 1) result.cards, 2) mapper theo tool name, 3) generic chỉ khi action có card_config (plugin đánh dấu)
+      const cardConfigByCall = new Map<string, { enabled?: boolean; list_path?: string; field_mapping?: Record<string, string> }>();
+      for (const call of calls) {
+        const sep = call.name.indexOf('__');
+        if (sep > 0 && sep < call.name.length - 1) {
+          const toolName = call.name.slice(0, sep);
+          const actionName = call.name.slice(sep + 2);
+          const config = await this.toolRegistryService.getCardConfig(toolName, actionName);
+          if (config) cardConfigByCall.set(call.name, config);
+        }
+      }
+      const cards = buildCardsFromToolResults(
+        calls,
+        results,
+        { shopFrontendUrl: this.configService?.get<string>('SHOP_FRONTEND_URL') },
+        { cardConfigByCall },
+      );
+
       return {
         functionCalls: null,
         geminiMessages: fnResponses,
         files: files,
+        cards,
       };
     })
     .addNode('finalize', async (state: typeof ChatGraphState.State) => {
@@ -317,6 +344,7 @@ export class ChatOrchestratorService {
     private readonly knowledgeService: KnowledgeService,
     private readonly toolRegistryService: ToolRegistryService,
     private readonly toolExecutorService: ToolExecutorService,
+    private readonly configService: ConfigService,
   ) {}
 
   async runChatTurn(params: {
@@ -328,7 +356,7 @@ export class ChatOrchestratorService {
     chatbot: Chatbot;
     /** Content extracted from attached images by plugin (e.g. OCR); images are not sent to the main model */
     extractedImageContent?: string;
-  }): Promise<{ response: string; turns: number; files: any[] }> {
+  }): Promise<{ response: string; turns: number; files: any[]; cards: any[] }> {
     const result = await this.graph.invoke({
       ...params,
       extractedImageContent: params.extractedImageContent ?? '',
@@ -340,12 +368,14 @@ export class ChatOrchestratorService {
       turn: 0,
       maxTurns: 5,
       files: [],
+      cards: [],
     });
 
     return {
       response: result.finalResponse,
       turns: result.turn,
       files: result.files ?? [],
+      cards: result.cards ?? [],
     };
   }
 

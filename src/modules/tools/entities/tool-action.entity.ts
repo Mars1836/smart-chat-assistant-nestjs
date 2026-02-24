@@ -31,6 +31,17 @@ export class ToolAction extends BaseEntity {
   @Column({ type: 'int', default: 0 })
   sort_order: number;
 
+  /**
+   * Đánh dấu action này trả về danh sách để hiển thị dạng card.
+   * { enabled: true, list_path?: 'data'|'items'|..., field_mapping?: { title, url, imageUrl, description } }
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  card_config: {
+    enabled?: boolean;
+    list_path?: string;
+    field_mapping?: Record<string, string>;
+  } | null;
+
   // Relations
   @ManyToOne(() => Tool, (tool) => tool.actions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'tool_id' })

@@ -258,6 +258,22 @@ export class ToolRegistryService {
   }
 
   /**
+   * Lấy card_config của action (plugin đánh dấu action trả về list → hiển thị card).
+   * Dùng với call name dạng "tool__action" (tách thành toolName, actionName).
+   */
+  async getCardConfig(
+    toolName: string,
+    actionName: string,
+  ): Promise<{
+    enabled?: boolean;
+    list_path?: string;
+    field_mapping?: Record<string, string>;
+  } | null> {
+    const pair = await this.getToolAction(toolName, actionName);
+    return pair?.action?.card_config ?? null;
+  }
+
+  /**
    * Get all built-in tools
    */
   async getBuiltInTools(): Promise<Tool[]> {

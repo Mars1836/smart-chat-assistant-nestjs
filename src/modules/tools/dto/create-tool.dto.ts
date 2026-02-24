@@ -42,6 +42,15 @@ export class CreateToolActionDto {
   @IsBoolean()
   @IsOptional()
   is_enabled?: boolean = true;
+
+  /** Đánh dấu action trả về list → hiển thị card. enabled, list_path, field_mapping (title/url/imageUrl/description) */
+  @IsObject()
+  @IsOptional()
+  card_config?: {
+    enabled?: boolean;
+    list_path?: string;
+    field_mapping?: Record<string, string>;
+  } | null;
 }
 
 export class CreateToolDto {
