@@ -35,6 +35,10 @@ export interface LLMResponse {
     name: string;
     args: any;
   }>;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
 }
 
 export interface ILLMProvider {

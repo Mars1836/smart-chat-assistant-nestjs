@@ -162,9 +162,21 @@ export class GeminiProvider implements ILLMProvider {
       const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
       const text = textParts.length > 0 ? textParts.join('\n') : undefined;
 
+      const usageMeta = (data as any).usageMetadata;
+
       return {
         text,
         functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+        usage: usageMeta
+          ? {
+              input_tokens: usageMeta.promptTokenCount || 0,
+              output_tokens:
+                (usageMeta.candidatesTokenCount || 0) +
+                (usageMeta.totalTokenCount
+                  ? usageMeta.totalTokenCount - usageMeta.promptTokenCount
+                  : 0),
+            }
+          : undefined,
       };
     } catch (error) {
       this.logger.error('Error in Gemini chat:', error);

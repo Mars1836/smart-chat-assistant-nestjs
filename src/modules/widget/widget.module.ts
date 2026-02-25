@@ -6,6 +6,7 @@ import { Message } from '../messages/entities/message.entity';
 import { RagModule } from '../rag/rag.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { ToolsModule } from '../tools/tools.module';
+import { BillingModule } from '../billing/billing.module';
 import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { OpenAIProvider } from '../../common/providers/openai.provider';
@@ -19,6 +20,7 @@ import { WidgetChatOrchestratorService } from './widget-chat-orchestrator.servic
     RagModule,
     KnowledgeModule,
     ToolsModule, // export ToolRegistryService & ToolExecutorService
+    BillingModule,
   ],
   controllers: [WidgetController],
   providers: [

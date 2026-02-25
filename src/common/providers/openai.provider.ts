@@ -118,11 +118,23 @@ export class OpenAIProvider implements ILLMProvider {
             name: tc.function.name,
             args: JSON.parse(tc.function.arguments),
           })),
+          usage: response.usage
+            ? {
+                input_tokens: response.usage.prompt_tokens || 0,
+                output_tokens: response.usage.completion_tokens || 0,
+              }
+            : undefined,
         };
       }
 
       return {
         text: message.content || undefined,
+        usage: response.usage
+          ? {
+              input_tokens: response.usage.prompt_tokens || 0,
+              output_tokens: response.usage.completion_tokens || 0,
+            }
+          : undefined,
       };
     } catch (error) {
       this.logger.error('Error calling OpenAI API', error);

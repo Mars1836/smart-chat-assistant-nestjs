@@ -15,6 +15,7 @@ import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { RagModule } from '../rag/rag.module';
 import { ToolsModule } from '../tools/tools.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { BillingModule } from '../billing/billing.module';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
 
 @Module({
@@ -35,6 +36,7 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
     RagModule,
     ToolsModule,
     KnowledgeModule,
+    BillingModule,
   ],
   controllers: [ChatbotsController],
   providers: [

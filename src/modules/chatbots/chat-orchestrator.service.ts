@@ -13,6 +13,7 @@ import { ToolExecutorService } from '../tools/tool-executor.service';
 import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { LLMMessage } from '../../common/interfaces/llm-provider.interface';
 import { buildCardsFromToolResults } from './card-mappers';
+import { BillingService } from '../billing/billing.service';
 
 type GeminiMessage = {
   role: 'user' | 'assistant' | 'function';
@@ -185,6 +186,30 @@ export class ChatOrchestratorService {
         },
       );
 
+      // Billing: charge usage per workspace if usage info is available
+      if (response.usage && state.workspaceId) {
+        try {
+          await this.billingService.chargeUsage(
+            state.workspaceId,
+            state.chatbot.llm_provider,
+            state.chatbot.llm_model,
+            {
+              input_tokens: response.usage.input_tokens,
+              output_tokens: response.usage.output_tokens,
+            },
+            {
+              conversationId: state.conversationId,
+              chatbotId: state.chatbotId,
+            },
+          );
+        } catch (err) {
+          this.logger.error(
+            `Failed to charge usage for workspace ${state.workspaceId}:`,
+            err as any,
+          );
+        }
+      }
+
       // If provider requests tool calls
       if (response.functionCalls && response.functionCalls.length > 0) {
         const calls = response.functionCalls;
@@ -345,6 +370,7 @@ export class ChatOrchestratorService {
     private readonly toolRegistryService: ToolRegistryService,
     private readonly toolExecutorService: ToolExecutorService,
     private readonly configService: ConfigService,
+    private readonly billingService: BillingService,
   ) {}
 
   async runChatTurn(params: {

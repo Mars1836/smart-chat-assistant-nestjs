@@ -11,6 +11,7 @@ import { ToolRegistryService } from '../tools/tool-registry.service';
 import { ToolExecutorService } from '../tools/tool-executor.service';
 import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { LLMMessage } from '../../common/interfaces/llm-provider.interface';
+import { BillingService } from '../billing/billing.service';
 
 type GeminiMessage = {
   role: 'user' | 'assistant' | 'function';
@@ -113,6 +114,7 @@ export class WidgetChatOrchestratorService {
     private readonly knowledgeService: KnowledgeService,
     private readonly toolRegistryService: ToolRegistryService,
     private readonly toolExecutorService: ToolExecutorService,
+    private readonly billingService: BillingService,
   ) {}
 
   /**
@@ -210,6 +212,31 @@ export class WidgetChatOrchestratorService {
         tools: state.tools as any,
       },
     );
+
+    // Billing: charge usage per workspace if usage info is available
+    if (response.usage && state.workspaceId) {
+      try {
+        await this.billingService.chargeUsage(
+          state.workspaceId,
+          state.chatbot.llm_provider,
+          state.chatbot.llm_model,
+          {
+            input_tokens: response.usage.input_tokens,
+            output_tokens: response.usage.output_tokens,
+          },
+          {
+            conversationId: state.conversationId,
+            chatbotId: state.chatbotId,
+            visitorId: state.visitorId,
+          },
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to charge usage for workspace ${state.workspaceId} (widget):`,
+          err as any,
+        );
+      }
+    }
 
     // If provider requests tool calls
     if (response.functionCalls && response.functionCalls.length > 0) {
