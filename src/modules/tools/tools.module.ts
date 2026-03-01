@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
 import { Tool } from './entities/tool.entity';
 import { ToolAction } from './entities/tool-action.entity';
 import { ChatbotTool } from './entities/chatbot-tool.entity';
@@ -20,6 +19,7 @@ import { OAuthController } from './oauth.controller';
 import { WorkspaceToolsService } from './workspace-tools.service';
 import { OAuthService } from './oauth.service';
 import { RagModule } from '../rag/rag.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { AuthModule } from '../auth/auth.module';
 import { FileCleanupModule } from './file-cleanup/file-cleanup.module';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
@@ -38,6 +38,7 @@ import { GeminiProvider } from '../../common/providers/gemini.provider';
       Workspace,
     ]),
     RagModule, // Import to use RagService
+    KnowledgeModule, // Import to use KnowledgeService (chatbot-knowledge permissions)
     AuthModule, // Import to provide JwtService & JwtAuthGuard in this module context
     FileCleanupModule,
   ],

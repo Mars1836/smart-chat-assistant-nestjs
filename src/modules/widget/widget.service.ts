@@ -20,7 +20,9 @@ export class WidgetService {
     private readonly widgetChatOrchestrator: WidgetChatOrchestratorService,
   ) {}
 
-  async chat(dto: WidgetChatDto): Promise<{ response: string; conversation_id: string; files?: any[] }> {
+  async chat(
+    dto: WidgetChatDto,
+  ): Promise<{ response: string; conversation_id: string; files?: any[]; cards?: any[] }> {
     const chatbot = await this.chatbotRepo.findOne({
       where: { id: dto.chatbotId },
     });
@@ -73,12 +75,14 @@ export class WidgetService {
       chatbot: chatbot,
     });
 
-    // 4. Save bot response
+    // 4. Save bot response (kèm token usage và tools đã dùng)
     const botMessage = this.messageRepo.create({
       conversation: { id: conversation.id } as Conversation,
       sender_type: 'bot',
       sender: null,
       content: result.response,
+      token_usage: result.tokenUsage ?? null,
+      tools_used: result.toolsUsed?.length ? result.toolsUsed : null,
     });
     await this.messageRepo.save(botMessage);
 
@@ -86,6 +90,7 @@ export class WidgetService {
       response: result.response,
       conversation_id: conversation.id,
       files: result.files,
+      cards: result.cards,
     };
   }
 }

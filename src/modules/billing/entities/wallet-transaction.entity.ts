@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity({ name: 'wallet_transactions' })
 export class WalletTransaction extends BaseEntity {
@@ -10,6 +11,14 @@ export class WalletTransaction extends BaseEntity {
 
   @Column({ type: 'uuid' })
   workspace_id: string;
+
+  /** Thành viên (user) liên quan: người dùng token (usage) hoặc người tạo phiên nạp (topup). Null nếu widget/khách hoặc webhook. */
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  user_id: string | null;
 
   @Column({ type: 'varchar', length: 20 })
   type: 'topup' | 'usage' | 'refund' | 'adjustment';

@@ -164,17 +164,24 @@ export class ToolRegistryService {
   async formatForLLMWithPermissions(chatbotId: string): Promise<any[]> {
     const enabledActions = await this.getEnabledActionsForChatbot(chatbotId);
 
-    return enabledActions.map(({ tool, action, config_override }) => {
-      const normalized = this.normalizeParameters(action.parameters);
+    const functionDeclarations = enabledActions.map(
+      ({ tool, action, config_override }) => {
+        const normalized = this.normalizeParameters(action.parameters);
 
-      return {
-        // Make each action a distinct callable function
-        // Example: rag_documents__search
-        name: `${tool.name}__${action.name}`,
-        description: `${tool.display_name}: ${action.description}`,
-        parameters: normalized,
-      };
-    });
+        return {
+          // Make each action a distinct callable function
+          // Example: rag_documents__search
+          name: `${tool.name}__${action.name}`,
+          description: `${tool.display_name}: ${action.description}`,
+          parameters: normalized,
+        };
+      },
+    );
+
+    // Thêm builtin tool knowledge_search – luôn khả dụng cho mọi chatbot, không cần add qua workspace
+    functionDeclarations.push(this.getBuiltinKnowledgeSearchTool());
+
+    return functionDeclarations;
   }
 
   /**
@@ -182,7 +189,7 @@ export class ToolRegistryService {
    * @deprecated Use formatForLLMWithPermissions for granular action control
    */
   formatForLLM(tools: Tool[]): any[] {
-    return tools.flatMap((tool) => {
+    const dbTools = tools.flatMap((tool) => {
       const actions = tool.actions ?? [];
 
       return actions
@@ -199,6 +206,9 @@ export class ToolRegistryService {
           };
         });
     });
+
+    // Deprecated path vẫn thêm builtin knowledge_search để tương thích
+    return [...dbTools, this.getBuiltinKnowledgeSearchTool()];
   }
 
   /**
@@ -228,6 +238,47 @@ export class ToolRegistryService {
       type: 'OBJECT',
       properties: parameters,
       required: [],
+    };
+  }
+
+  /**
+   * Builtin knowledge_search tool – không lưu trong DB, luôn khả dụng cho mọi chatbot.
+   * Dùng để agent chủ động gọi RAG search khi cần.
+   */
+  private getBuiltinKnowledgeSearchTool(): any {
+    return {
+      name: 'knowledge_search',
+      description:
+        'Search workspace knowledge bases using RAG. Use when you need factual information from uploaded documents or knowledge bases instead of guessing.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'User question or rewritten search query to look up in knowledge bases.',
+          },
+          top_k: {
+            type: 'number',
+            description:
+              'Maximum number of relevant chunks to return (default 5).',
+          },
+          min_score: {
+            type: 'number',
+            description:
+              'Optional minimum similarity score (0-1). If not provided, use chatbot default.',
+          },
+          knowledge_ids: {
+            type: 'array',
+            description:
+              'Optional list of knowledge base IDs to restrict search to. If omitted, search across all knowledge bases in the workspace.',
+            items: {
+              type: 'string',
+            },
+          },
+        },
+        required: ['query'],
+      },
     };
   }
 

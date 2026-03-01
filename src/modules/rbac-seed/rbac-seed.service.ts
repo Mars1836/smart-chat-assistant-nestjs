@@ -138,7 +138,10 @@ export class RbacSeedService implements OnModuleInit {
     // 2. Define permission sets
     const allPermissions = Object.values(WORKSPACE_PERMISSIONS);
 
-    const adminPermissions = allPermissions.filter((p) => p !== WORKSPACE_PERMISSIONS.WORKSPACE_DELETE);
+    const adminPermissions = allPermissions.filter(
+      (p) =>
+        p !== WORKSPACE_PERMISSIONS.WORKSPACE_DELETE,
+    );
 
     const editorPermissions = [
       WORKSPACE_PERMISSIONS.CHATBOT_CREATE,

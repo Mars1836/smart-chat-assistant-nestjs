@@ -82,9 +82,32 @@ const ChatGraphState = Annotation.Root({
     default: () => '',
   }),
 
+  /** Số vòng đã chạy tools (router -> execute_tools). Dùng để giới hạn retry tools. */
+  toolRunCount: Annotation<number>({
+    reducer: (_left: number, right: number) => right,
+    default: () => 0,
+  }),
+
   /** Cards chung (product / article / link) từ tool để FE render card có ảnh + link */
   cards: Annotation<any[]>({
     reducer: (_left: any[], right: any[]) => (Array.isArray(right) ? right : []),
+    default: () => [],
+  }),
+
+  /** Tích lũy token usage qua router + answer (để lưu vào message). */
+  totalInputTokens: Annotation<number>({
+    reducer: (left: number, right: number) => left + (right ?? 0),
+    default: () => 0,
+  }),
+  totalOutputTokens: Annotation<number>({
+    reducer: (left: number, right: number) => left + (right ?? 0),
+    default: () => 0,
+  }),
+
+  /** Danh sách tools đã gọi và kết quả (để lưu vào message). */
+  toolsUsedLog: Annotation<{ tool_name: string; args: Record<string, any>; result: any }[]>({
+    reducer: (left, right) =>
+      left.concat(Array.isArray(right) ? right : []),
     default: () => [],
   }),
 });
@@ -132,61 +155,53 @@ export class ChatOrchestratorService {
     .addNode(
       'prepare_knowledge',
       async (state: typeof ChatGraphState.State) => {
-        const knowledgeIds =
-          await this.knowledgeService.getEnabledKnowledgeIdsForChatbot(
-            state.chatbotId,
-          );
-
-        const contexts =
-          knowledgeIds.length > 0
-            ? await this.ragService.searchForChatbot(
-                state.userMessage,
-                state.chatbotId,
-                knowledgeIds,
-                3,
-                state.chatbot.confidence_threshold,
-              )
-            : []; // If no knowledge linked, skip RAG (do not fallback to workspace search)
-
-        const contextString =
-          contexts.length > 0
-            ? `\n\n[Context Information]:\n${contexts.join('\n\n')}\n\n[End Context]`
-            : '';
-
-        const systemInstruction =
-          this.buildSystemInstruction(state.chatbot) + contextString;
-
+        // Không auto gọi RAG nữa.
+        // Chỉ build system instruction cơ bản, để LLM tự quyết định dùng tool knowledge_search khi cần.
+        const systemInstruction = this.buildSystemInstruction(state.chatbot);
         return { systemInstruction };
       },
     )
-    .addNode('llm_step', async (state: typeof ChatGraphState.State) => {
+    // Router agent: quyết định dùng tools nào (đặc biệt là knowledge_search), không trả lời người dùng.
+    .addNode('router_step', async (state: typeof ChatGraphState.State) => {
       const nextTurn = state.turn + 1;
       const provider = this.llmFactory.getProvider(state.chatbot.llm_model);
 
-      const messages: LLMMessage[] = state.geminiMessages.map(msg => ({
-          role: msg.role as any,
-          content: msg.content || (msg as any).parts?.[0]?.text, // Handle legacy parts if present or content directly
-          functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
-          functionResponse: msg.functionResponse || (msg as any).parts?.[0]?.functionResponse 
+      const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
+        role: msg.role as any,
+        content:
+          msg.content || (msg as any).parts?.[0]?.text,
+        functionCall:
+          msg.functionCall || (msg as any).parts?.[0]?.functionCall,
+        functionResponse:
+          msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
             ? {
-                name: msg.functionResponse?.name ?? (msg as any).parts[0].functionResponse.name,
-                response: msg.functionResponse?.response ?? (msg as any).parts[0].functionResponse.response
-              } 
-            : undefined
+                name:
+                  msg.functionResponse?.name ??
+                  (msg as any).parts[0].functionResponse.name,
+                response:
+                  msg.functionResponse?.response ??
+                  (msg as any).parts[0].functionResponse.response,
+              }
+            : undefined,
       }));
 
-      const response = await provider.chat(
-        state.chatbot.llm_model,
-        messages,
-        {
-          temperature: state.chatbot.temperature,
-          maxTokens: state.chatbot.max_tokens,
-          systemInstruction: state.systemInstruction,
-          tools: state.tools as any,
-        },
-      );
+      const routerSystemInstruction =
+        (state.systemInstruction || '') +
+        '\n\n[ROLE: TOOL ROUTER]\n' +
+        'Bạn là Router Agent. Nhiệm vụ của bạn là phân tích câu hỏi hiện tại và ngữ cảnh hội thoại, ' +
+        'sau đó QUYẾT ĐỊNH NÊN GỌI NHỮNG TOOL NÀO (có thể là 0, 1 hoặc N tools khác nhau) VÀ THAM SỐ CỤ THỂ CHO TỪNG TOOL, ' +
+        'đặc biệt là `knowledge_search` cho các câu hỏi cần tra cứu tài liệu/knowledge. ' +
+        'KHÔNG được trả lời nội dung cuối cùng cho người dùng ở bước này, chỉ nên tạo các function call phù hợp. ' +
+        'Nếu thực sự không cần tools (câu hỏi quá đơn giản, chỉ cần trả lời trực tiếp), bạn có thể không tạo function call nào.';
 
-      // Billing: charge usage per workspace if usage info is available
+      const response = await provider.chat(state.chatbot.llm_model, messages, {
+        temperature: state.chatbot.temperature,
+        maxTokens: state.chatbot.max_tokens,
+        systemInstruction: routerSystemInstruction,
+        tools: state.tools as any,
+      });
+
+      // Billing cho router agent
       if (response.usage && state.workspaceId) {
         try {
           await this.billingService.chargeUsage(
@@ -200,20 +215,31 @@ export class ChatOrchestratorService {
             {
               conversationId: state.conversationId,
               chatbotId: state.chatbotId,
+              phase: 'router',
             },
+            state.userId,
           );
         } catch (err) {
           this.logger.error(
-            `Failed to charge usage for workspace ${state.workspaceId}:`,
+            `Failed to charge usage (router) for workspace ${state.workspaceId}:`,
             err as any,
           );
         }
       }
 
-      // If provider requests tool calls
+      // Lưu token usage để trả về cuối turn
+      const tokenUpdate =
+        response.usage != null
+          ? {
+              totalInputTokens: response.usage.input_tokens ?? 0,
+              totalOutputTokens: response.usage.output_tokens ?? 0,
+            }
+          : {};
+
+      // Router chỉ quan tâm tới function calls (nếu có)
       if (response.functionCalls && response.functionCalls.length > 0) {
         const calls = response.functionCalls;
-        
+
         const callMsgs: any[] = calls.map((call) => ({
           role: 'assistant',
           functionCall: { name: call.name, args: call.args },
@@ -223,20 +249,102 @@ export class ChatOrchestratorService {
           turn: nextTurn,
           functionCalls: calls as any,
           geminiMessages: callMsgs as any,
+          ...tokenUpdate,
         };
       }
+
+      // Không có tools nào cần gọi -> chuyển sang Answer Agent
+      return {
+        turn: nextTurn,
+        functionCalls: null,
+        ...tokenUpdate,
+      };
+    })
+    // Answer agent: tổng hợp kết quả từ tools (nếu có) và trả lời người dùng. Không được gọi thêm tools.
+    .addNode('answer_step', async (state: typeof ChatGraphState.State) => {
+      const nextTurn = state.turn + 1;
+      const provider = this.llmFactory.getProvider(state.chatbot.llm_model);
+
+      const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
+        role: msg.role as any,
+        content:
+          msg.content || (msg as any).parts?.[0]?.text,
+        functionCall:
+          msg.functionCall || (msg as any).parts?.[0]?.functionCall,
+        functionResponse:
+          msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
+            ? {
+                name:
+                  msg.functionResponse?.name ??
+                  (msg as any).parts[0].functionResponse.name,
+                response:
+                  msg.functionResponse?.response ??
+                  (msg as any).parts[0].functionResponse.response,
+              }
+            : undefined,
+      }));
+
+      const answerSystemInstruction =
+        (state.systemInstruction || '') +
+        '\n\n[ROLE: ANSWER AGENT]\n' +
+        'Bạn là Answer Agent. Nhiệm vụ của bạn là đọc toàn bộ ngữ cảnh hội thoại và kết quả từ các tools (function responses) ' +
+        'đã được Router Agent gọi trước đó, sau đó soạn câu trả lời cuối cùng, rõ ràng, cô đọng và hữu ích cho người dùng. ' +
+        'Ở bước này, bạn KHÔNG ĐƯỢC gọi thêm tools mới; hãy chỉ sử dụng các thông tin đã có trong messages hiện tại.';
+
+      const response = await provider.chat(state.chatbot.llm_model, messages, {
+        temperature: state.chatbot.temperature,
+        maxTokens: state.chatbot.max_tokens,
+        systemInstruction: answerSystemInstruction,
+        // Không truyền tools vào Answer Agent để tránh việc gọi thêm tools vòng 2
+      });
+
+      // Billing cho answer agent
+      if (response.usage && state.workspaceId) {
+        try {
+          await this.billingService.chargeUsage(
+            state.workspaceId,
+            state.chatbot.llm_provider,
+            state.chatbot.llm_model,
+            {
+              input_tokens: response.usage.input_tokens,
+              output_tokens: response.usage.output_tokens,
+            },
+            {
+              conversationId: state.conversationId,
+              chatbotId: state.chatbotId,
+              phase: 'answer',
+            },
+            state.userId,
+          );
+        } catch (err) {
+          this.logger.error(
+            `Failed to charge usage (answer) for workspace ${state.workspaceId}:`,
+            err as any,
+          );
+        }
+      }
+
+      const tokenUpdate =
+        response.usage != null
+          ? {
+              totalInputTokens: response.usage.input_tokens ?? 0,
+              totalOutputTokens: response.usage.output_tokens ?? 0,
+            }
+          : {};
 
       if (response.text) {
         return {
           turn: nextTurn,
           functionCalls: null,
           finalResponse: response.text,
+          ...tokenUpdate,
         };
       }
 
       return {
         turn: nextTurn,
         functionCalls: null,
+        ...tokenUpdate,
       };
     })
     .addNode('execute_tools', async (state: typeof ChatGraphState.State) => {
@@ -305,6 +413,12 @@ export class ChatOrchestratorService {
         },
       }));
 
+      const toolsUsedLog = calls.map((call, idx) => ({
+        tool_name: call.name,
+        args: call.args ?? {},
+        result: results[idx],
+      }));
+
       // Card: 1) result.cards, 2) mapper theo tool name, 3) generic chỉ khi action có card_config (plugin đánh dấu)
       const cardConfigByCall = new Map<string, { enabled?: boolean; list_path?: string; field_mapping?: Record<string, string> }>();
       for (const call of calls) {
@@ -328,6 +442,8 @@ export class ChatOrchestratorService {
         geminiMessages: fnResponses,
         files: files,
         cards,
+        toolRunCount: state.toolRunCount + 1,
+        toolsUsedLog,
       };
     })
     .addNode('finalize', async (state: typeof ChatGraphState.State) => {
@@ -344,20 +460,36 @@ export class ChatOrchestratorService {
     .addEdge(START, 'prepare_tools')
     .addEdge('prepare_tools', 'prepare_history')
     .addEdge('prepare_history', 'prepare_knowledge')
-    .addEdge('prepare_knowledge', 'llm_step')
+    .addEdge('prepare_knowledge', 'router_step')
     .addConditionalEdges(
-      'llm_step',
+      'router_step',
       (state: typeof ChatGraphState.State) => {
         if (state.turn >= state.maxTurns) return 'finalize';
-        if (state.functionCalls && state.functionCalls.length > 0) return 'execute_tools';
-        return 'finalize';
+        if (state.functionCalls && state.functionCalls.length > 0)
+          return 'execute_tools';
+        return 'answer_step';
       },
       {
         execute_tools: 'execute_tools',
+        answer_step: 'answer_step',
         finalize: 'finalize',
       },
     )
-    .addEdge('execute_tools', 'llm_step')
+    // Sau khi chạy tools:
+    // - Nếu đây là lần chạy tools đầu tiên -> quay lại router_step để router có thể quyết định gọi lại tools lần 2 nếu cần.
+    // - Nếu đã chạy tools >= 1 lần -> chuyển sang answer_step để trả lời người dùng.
+    .addConditionalEdges(
+      'execute_tools',
+      (state: typeof ChatGraphState.State) => {
+        if (state.toolRunCount <= 0) return 'router_step';
+        return 'answer_step';
+      },
+      {
+        router_step: 'router_step',
+        answer_step: 'answer_step',
+      },
+    )
+    .addEdge('answer_step', 'finalize')
     .addEdge('finalize', END)
     .compile();
 
@@ -382,7 +514,14 @@ export class ChatOrchestratorService {
     chatbot: Chatbot;
     /** Content extracted from attached images by plugin (e.g. OCR); images are not sent to the main model */
     extractedImageContent?: string;
-  }): Promise<{ response: string; turns: number; files: any[]; cards: any[] }> {
+  }): Promise<{
+    response: string;
+    turns: number;
+    files: any[];
+    cards: any[];
+    tokenUsage?: { input_tokens: number; output_tokens: number };
+    toolsUsed: { tool_name: string; args: Record<string, any>; result: any }[];
+  }> {
     const result = await this.graph.invoke({
       ...params,
       extractedImageContent: params.extractedImageContent ?? '',
@@ -395,13 +534,27 @@ export class ChatOrchestratorService {
       maxTurns: 5,
       files: [],
       cards: [],
+      toolRunCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      toolsUsedLog: [],
     });
+
+    const tokenUsage =
+      (result.totalInputTokens ?? 0) > 0 || (result.totalOutputTokens ?? 0) > 0
+        ? {
+            input_tokens: result.totalInputTokens ?? 0,
+            output_tokens: result.totalOutputTokens ?? 0,
+          }
+        : undefined;
 
     return {
       response: result.finalResponse,
       turns: result.turn,
       files: result.files ?? [],
       cards: result.cards ?? [],
+      tokenUsage,
+      toolsUsed: result.toolsUsedLog ?? [],
     };
   }
 
@@ -419,6 +572,12 @@ export class ChatOrchestratorService {
     }
     parts.push(
       'Hãy trả lời một cách ngắn gọn, rõ ràng và hữu ích. Nếu không chắc chắn, hãy thừa nhận và đề xuất cách khác.',
+    );
+    parts.push(
+     'Tuyệt đối không hỏi lại người dùng chỉ sử dụng thông tin đã có trong tin nhắn trước đó',
+    );
+    parts.push(
+      'HÃY TẬN DỤNG TỐI ĐA các công cụ (tools) đã được khai báo, chủ động sử dụng tất cả các tools phù hợp mà không cần hỏi lại người dùng. Sử dụng tool là điều được ưu tiên hơn trả lời chung chung hoặc yêu cầu người dùng lặp lại. '
     );
 
     // Hướng dẫn riêng cho trường hợp có ảnh đính kèm đã được OCR trước ở backend

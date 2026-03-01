@@ -24,6 +24,9 @@ export const WORKSPACE_PERMISSIONS = {
   DOCUMENT_UPDATE: 'document.update',
   DOCUMENT_DELETE: 'document.delete',
   DOCUMENT_VIEW: 'document.view',
+
+  // Billing (ví workspace, giao dịch, token usage)
+  BILLING_VIEW_TRANSACTIONS: 'billing.view_transactions',
 } as const;
 
 export type WorkspacePermissionType =

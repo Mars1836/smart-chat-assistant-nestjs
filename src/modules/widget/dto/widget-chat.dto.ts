@@ -26,5 +26,7 @@ export class WidgetChatDto {
 export class WidgetChatResponseDto {
   response: string;
   conversation_id: string;
+  files?: any[];
+  cards?: any[];
 }
 

@@ -176,6 +176,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
     uploaded_images: any[];
     cards: any[];
     processingTime: number;
+    token_usage: { input_tokens: number; output_tokens: number };
+    tools_used: { tool_name: string; args: Record<string, any>; result: any }[];
   }> {
     const startTime = Date.now();
 
@@ -250,7 +252,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         }
       }
 
-      const { response: finalResponseText, files, cards } =
+      const { response: finalResponseText, files, cards, tokenUsage, toolsUsed } =
         await this.chatOrchestrator.runChatTurn({
           workspaceId,
           chatbotId,
@@ -261,12 +263,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
           extractedImageContent,
         });
 
-      // Lưu tin nhắn bot vào database
+      // Lưu tin nhắn bot vào database (kèm token usage và tools đã dùng)
       const botMessage = this.messageRepo.create({
         conversation: { id: chatDto.conversation_id } as Conversation,
         sender_type: 'bot',
         sender: null,
         content: finalResponseText,
+        token_usage: tokenUsage ?? null,
+        tools_used: toolsUsed?.length ? toolsUsed : null,
       });
       const savedBotMessage = await this.messageRepo.save(botMessage);
 
@@ -299,6 +303,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
         uploaded_images: uploadedImages,
         cards: cards || [],
         processingTime,
+        token_usage: tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
+        tools_used: toolsUsed ?? [],
       };
     } catch (error) {
       this.logger.error('Error in chat:', error);
@@ -324,6 +330,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
         uploaded_images: uploadedImages,
         cards: [],
         processingTime: Date.now() - startTime,
+        token_usage: { input_tokens: 0, output_tokens: 0 },
+        tools_used: [],
       };
     }
   }

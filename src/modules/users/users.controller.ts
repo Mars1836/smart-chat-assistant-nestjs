@@ -19,8 +19,16 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserResponseDto,
+  UserStatsSummaryDto,
+  UserStatsByDateQueryDto,
+  UserStatsByDateItemDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SystemAdminGuard } from './guards/system-admin.guard';
 import { User } from '../../common/decorators';
 import {
   PaginationDto,
@@ -36,12 +44,14 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
+  @UseGuards(SystemAdminGuard)
   @ApiOperation({ summary: 'Tạo user mới (chỉ admin)' })
   @ApiResponse({
     status: 201,
     description: 'User created successfully',
     type: UserResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới được tạo user' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
@@ -61,6 +71,7 @@ export class UsersController {
   }
 
   @Get()
+  @UseGuards(SystemAdminGuard)
   @ApiExtraModels(
     UserResponseDto,
     PaginatedResponseDto,
@@ -68,10 +79,11 @@ export class UsersController {
     PaginationDto,
   )
   @ApiOperation({
-    summary: 'Lấy danh sách users (có phân trang)',
+    summary: 'Lấy danh sách users (chỉ admin)',
     description:
-      'Trả về danh sách users với phân trang. Hỗ trợ query params: page, limit, sortBy, sortOrder',
+      'Trả về danh sách users với phân trang. Chỉ admin. Query: page, limit, sortBy, sortOrder',
   })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới được xem danh sách' })
   @ApiOkResponse({
     description: 'Paginated list of users',
     schema: {
@@ -115,16 +127,63 @@ export class UsersController {
     return this.usersService.findAll(pagination);
   }
 
+  @Get('stats/summary')
+  @UseGuards(SystemAdminGuard)
+  @ApiOperation({
+    summary: 'Thống kê tổng quan user (chỉ admin)',
+    description:
+      'Tổng số user, số theo vai trò (admin/user/no_role), user mới 7/30 ngày qua',
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin' })
+  @ApiOkResponse({
+    description: 'Thống kê tổng quan',
+    type: UserStatsSummaryDto,
+  })
+  getStatsSummary(): Promise<UserStatsSummaryDto> {
+    return this.usersService.getStatsSummary();
+  }
+
+  @Get('stats/by-date')
+  @UseGuards(SystemAdminGuard)
+  @ApiOperation({
+    summary: 'Thống kê user theo thời gian (chỉ admin)',
+    description:
+      'Số user tạo mới theo từng ngày/tuần/tháng trong khoảng from–to. Dùng cho biểu đồ.',
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin' })
+  @ApiOkResponse({
+    description: 'Mảng { date, count }',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { date: { type: 'string' }, count: { type: 'number' } },
+      },
+    },
+  })
+  getStatsByDate(
+    @Query() query: UserStatsByDateQueryDto,
+  ): Promise<UserStatsByDateItemDto[]> {
+    return this.usersService.getStatsByDate(query);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin chi tiết user' })
+  @ApiOperation({
+    summary: 'Lấy thông tin chi tiết user',
+    description: 'Xem chính mình: mọi user. Xem user khác: chỉ admin.',
+  })
   @ApiResponse({
     status: 200,
     description: 'User details',
     type: UserResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới được xem user khác' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @User('sub') currentUserId?: string,
+  ) {
+    return this.usersService.findOne(id, currentUserId);
   }
 
   @Patch('profile')

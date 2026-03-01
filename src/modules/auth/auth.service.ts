@@ -55,7 +55,13 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
-    // Generate tokens
+    // Load với systemRole để trả system_role trong response
+    const userWithRole = await this.userRepository.findOne({
+      where: { id: savedUser.id },
+      relations: ['systemRole'],
+      select: ['id', 'name', 'email'],
+    });
+
     const accessToken = this.jwtService.sign({
       sub: savedUser.id,
       email: savedUser.email,
@@ -69,7 +75,14 @@ export class AuthService {
       } as any,
     );
 
-    return { accessToken, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      id: userWithRole!.id,
+      name: userWithRole!.name,
+      email: userWithRole!.email,
+      system_role: userWithRole!.systemRole?.name ?? null,
+    };
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -95,7 +108,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Generate tokens
+    // Load user với systemRole để trả system_role trong response (FE chuyển trang theo role)
+    const userWithRole = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['systemRole'],
+      select: ['id', 'name', 'email'],
+    });
+
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
@@ -109,7 +128,14 @@ export class AuthService {
       } as any,
     );
 
-    return { accessToken, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      id: userWithRole!.id,
+      name: userWithRole!.name,
+      email: userWithRole!.email,
+      system_role: userWithRole!.systemRole?.name ?? null,
+    };
   }
 
   refresh(refreshDto: RefreshDto): RefreshResponseDto {
@@ -132,7 +158,8 @@ export class AuthService {
   async profile(userId: string): Promise<ProfileResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'name', 'email', 'avatar_url', 'language'],
+      select: ['id', 'name', 'email', 'avatar_url', 'language', 'system_role_id'],
+      relations: ['systemRole'],
     });
 
     if (!user) {
@@ -143,6 +170,7 @@ export class AuthService {
       id: user.id,
       name: user.name,
       email: user.email,
+      system_role: user.systemRole?.name ?? null,
     };
   }
 

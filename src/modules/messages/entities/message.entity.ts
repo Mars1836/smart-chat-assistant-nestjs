@@ -26,4 +26,12 @@ export class Message extends BaseEntity {
     cascade: true,
   })
   attachments: MessageAttachment[];
+
+  /** Token usage cho tin nhắn bot (input_tokens, output_tokens). Chỉ có khi sender_type = bot. */
+  @Column({ type: 'jsonb', nullable: true })
+  token_usage: { input_tokens: number; output_tokens: number } | null;
+
+  /** Tools và kết quả mà chatbot đã gọi cho tin nhắn này. Chỉ có khi sender_type = bot. */
+  @Column({ type: 'jsonb', nullable: true })
+  tools_used: { tool_name: string; args: Record<string, any>; result: any }[] | null;
 }

@@ -42,7 +42,7 @@ export class DocumentProcessingProcessor extends WorkerHost {
       const text = await this.parsingService.extractText(absolutePath, mimetype);
       await this.updateProgress(documentId, 30, 'Đang chia nhỏ văn bản...');
 
-      // 3. Chunk (CSV: mỗi dòng context = 1 chunk; các loại khác: split theo kích thước)
+      // 3. Chunk (CSV: mỗi dòng context = 1 chunk; các loại khác: chunk theo đoạn / heading)
       let chunks: string[];
       if (mimetype === 'text/csv' || mimetype === 'csv') {
         chunks = text
@@ -50,8 +50,16 @@ export class DocumentProcessingProcessor extends WorkerHost {
           .map((s) => s.trim())
           .filter((s) => s.length > 0);
       } else {
-        chunks = await this.parsingService.chunkText(text);
+        // Gọi chunkText với hint về mimeType; sẽ tự chọn chiến lược phù hợp (md, txt/OCR, pdf/docx...)
+        chunks = await this.parsingService.chunkText(text, {
+          mimeType: mimetype,
+        });
       }
+      // Lấy meta document để thêm file_name vào chunk khi index
+      const document = await this.documentRepo.findOne({
+        where: { id: documentId },
+      });
+
       await this.documentRepo.update(documentId, { chunk_count: chunks.length });
       await this.updateProgress(documentId, 40, `Đã chia thành ${chunks.length} đoạn. Đang tạo vector...`);
 
@@ -60,7 +68,13 @@ export class DocumentProcessingProcessor extends WorkerHost {
       await this.vectorStoreService.deleteByDocumentId(documentId);
 
       for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
+        const rawChunk = chunks[i];
+
+        // Thêm metadata (file_name) vào nội dung chunk để LLM hiểu nguồn context
+        const prefix = document?.file_name
+          ? `[Source: ${document.file_name}]\n\n`
+          : '';
+        const chunk = `${prefix}${rawChunk}`;
         
         // Rate limit mitigation: sleep slightly? Gemini is fast but generous rate limits.
         // Parallelize? Be careful with API limits. Sequential is safer for now.

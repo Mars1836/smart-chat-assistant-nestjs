@@ -12,6 +12,7 @@ import { RagService } from '../rag/rag.service';
 import { OAuthService } from './oauth.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { FileCleanupProducer } from './file-cleanup/file-cleanup.producer';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 @Injectable()
 export class ToolExecutorService {
@@ -29,6 +30,7 @@ export class ToolExecutorService {
     private readonly oauthService: OAuthService,
     private readonly fileCleanupProducer: FileCleanupProducer,
     private readonly geminiProvider: GeminiProvider,
+    private readonly knowledgeService: KnowledgeService,
   ) {}
 
   /**
@@ -39,6 +41,11 @@ export class ToolExecutorService {
     params: Record<string, any>,
     context: ExecutionContext,
   ): Promise<any> {
+    // Builtin knowledge_search tool (không nằm trong DB, luôn khả dụng cho mọi chatbot)
+    if (toolName === 'knowledge_search') {
+      return this.executeKnowledgeSearch(params, context);
+    }
+
     // Support calling a specific action via "tool__action" (Coze-like)
     const [baseToolName, actionNameFromCall] = toolName.includes('__')
       ? (toolName.split('__', 2) as [string, string])
@@ -162,6 +169,72 @@ export class ToolExecutorService {
     }
 
     return this.executors.get(cacheKey)!;
+  }
+
+  /**
+   * Builtin executor cho knowledge_search (RAG search) – không dùng DB tool.
+   */
+  private async executeKnowledgeSearch(
+    params: Record<string, any>,
+    context: ExecutionContext,
+  ): Promise<any> {
+    const query = (params.query || params.q || '').toString().trim();
+    if (!query) {
+      throw new Error('knowledge_search requires a non-empty query');
+    }
+
+    const topK =
+      typeof params.top_k === 'number' && params.top_k > 0
+        ? Math.floor(params.top_k)
+        : 5;
+    const minScore =
+      typeof params.min_score === 'number' ? params.min_score : undefined;
+
+    // Lấy danh sách knowledge mà chatbot này được phép dùng
+    const allowedKnowledgeIds =
+      context.chatbotId
+        ? await this.knowledgeService.getEnabledKnowledgeIdsForChatbot(
+            context.chatbotId,
+          )
+        : [];
+
+    // Nếu caller truyền knowledge_ids thì chỉ cho phép dùng giao giữa requested và allowed
+    let knowledgeIds: string[] = [];
+    if (Array.isArray(params.knowledge_ids)) {
+      const requested = params.knowledge_ids
+        .map((id: any) => id && id.toString())
+        .filter(Boolean);
+      knowledgeIds = requested.filter((id) => allowedKnowledgeIds.includes(id));
+    } else {
+      knowledgeIds = allowedKnowledgeIds;
+    }
+
+    if (!knowledgeIds || knowledgeIds.length === 0) {
+      this.logger.warn(
+        `knowledge_search: chatbot ${context.chatbotId} has no accessible knowledge bases. Returning empty result.`,
+      );
+      return {
+        query,
+        top_k: topK,
+        results: [],
+      };
+    }
+
+    const options = { knowledgeIds, minScore };
+
+    this.logger.log(
+      `Executing builtin knowledge_search: query="${query}", topK=${topK}, options=${JSON.stringify(
+        options,
+      )}`,
+    );
+
+    const results = await this.ragService.search(query, options, topK);
+
+    return {
+      query,
+      top_k: topK,
+      results,
+    };
   }
 
   /**

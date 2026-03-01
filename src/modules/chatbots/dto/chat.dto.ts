@@ -87,4 +87,16 @@ export class ChatResponseDto {
     example: 1234,
   })
   processingTime: number;
+
+  @ApiPropertyOptional({
+    description: 'Token usage của lượt chat (input + output). Có khi LLM trả về usage.',
+    example: { input_tokens: 120, output_tokens: 45 },
+  })
+  token_usage?: { input_tokens: number; output_tokens: number } | null;
+
+  @ApiPropertyOptional({
+    description: 'Tools đã gọi và kết quả trong lượt chat. Dùng để hiển thị Details.',
+    example: [{ tool_name: 'knowledge_search', args: { query: '...' }, result: {} }],
+  })
+  tools_used?: { tool_name: string; args: Record<string, any>; result: any }[] | null;
 }

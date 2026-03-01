@@ -17,7 +17,12 @@ export class WidgetController {
   })
   async chat(@Body() dto: WidgetChatDto): Promise<WidgetChatResponseDto> {
     const result = await this.widgetService.chat(dto);
-    return { response: result.response, conversation_id: result.conversation_id };
+    return {
+      response: result.response,
+      conversation_id: result.conversation_id,
+      files: result.files,
+      cards: result.cards,
+    };
   }
 }
 

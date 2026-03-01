@@ -5,7 +5,10 @@ import { WorkspaceWallet } from './entities/workspace-wallet.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { WalletTopupSession } from './entities/wallet-topup-session.entity';
 import { ConfigService } from '@nestjs/config';
+import { LlmModelService } from './llm-model.service';
 import { Observable, Subject } from 'rxjs';
+import { PaginatedResult } from '../../common/interfaces/pagination.interface';
+import { createPaginatedResult } from '../../common/utils/pagination.util';
 
 export interface LLMUsage {
   input_tokens: number;
@@ -24,6 +27,7 @@ export class BillingService {
     private readonly txRepo: Repository<WalletTransaction>,
     @InjectRepository(WalletTopupSession)
     private readonly sessionRepo: Repository<WalletTopupSession>,
+    private readonly llmModelService: LlmModelService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -82,8 +86,8 @@ export class BillingService {
 
   /**
    * Charge usage based on token counts.
-   * Pricing is controlled via ENV:
-   * - BILLING_PRICE_PER_1K_TOKENS (default 0) – same rate for all providers/models for now.
+   * - amount trong giao dịch = số credits (token) đã dùng = totalTokens (lưu âm vì là trừ).
+   * - Balance ví trừ theo giá per 1K input/output lấy từ bảng llm_models (provider+model).
    */
   async chargeUsage(
     workspaceId: string,
@@ -91,35 +95,32 @@ export class BillingService {
     model: string,
     usage: LLMUsage,
     metadata?: Record<string, any>,
+    /** Thành viên (user) đã dùng token; null nếu widget/khách. */
+    userId?: string | null,
   ): Promise<void> {
-    const pricePer1K =
-      Number(this.configService.get<string>('BILLING_PRICE_PER_1K_TOKENS')) || 0;
-
-    if (!pricePer1K) {
-      // Billing disabled – still log usage transaction with amount 0 for observability
-      this.logger.debug(
-        `Billing disabled (BILLING_PRICE_PER_1K_TOKENS=0). Logging usage only for workspace ${workspaceId}.`,
-      );
-    }
-
-    const totalTokens =
-      (usage.input_tokens || 0) + (usage.output_tokens || 0);
-    const amount = (totalTokens * pricePer1K) / 1000;
+    const inputTokens = usage.input_tokens || 0;
+    const outputTokens = usage.output_tokens || 0;
+    const totalTokens = inputTokens + outputTokens;
+    const prices = await this.llmModelService.getPrices(provider, model);
+    const balanceDeduct =
+      (inputTokens * prices.inputPer1K + outputTokens * prices.outputPer1K) /
+      1000;
 
     const wallet = await this.getOrCreateWallet(workspaceId);
 
-    // Update balance only when pricePer1K > 0
-    if (pricePer1K > 0) {
+    if (balanceDeduct > 0) {
       const current = Number(wallet.balance || '0');
-      const newBalance = current - amount;
+      const newBalance = current - balanceDeduct;
       wallet.balance = newBalance.toFixed(4);
       await this.walletRepo.save(wallet);
     }
 
+    // amount = số credits (token) đã sử dụng, lưu âm để thể hiện giao dịch trừ
     const tx = this.txRepo.create({
       workspace_id: workspaceId,
+      user_id: userId ?? null,
       type: 'usage',
-      amount: (-amount).toFixed(4),
+      amount: (-totalTokens).toFixed(4),
       description: `LLM usage: provider=${provider}, model=${model}, tokens=${totalTokens}`,
       llm_provider: provider,
       llm_model: model,
@@ -150,6 +151,8 @@ export class BillingService {
   async createVietQRTopup(
     workspaceId: string,
     amount: number,
+    /** Thành viên tạo phiên nạp (user gọi API). */
+    initiatedByUserId?: string | null,
   ): Promise<{
     amount: number;
     currency: string;
@@ -181,8 +184,12 @@ export class BillingService {
       );
     }
 
-    // Tạo session với code ngắn 11 ký tự
-    const session = await this.createTopupSession(workspaceId, amount);
+    // Tạo session với code ngắn 11 ký tự (lưu initiatedByUserId để ghi vào giao dịch khi topup thành công)
+    const session = await this.createTopupSession(
+      workspaceId,
+      amount,
+      initiatedByUserId,
+    );
 
     // Tham chiếu topup nội bộ + nội dung chuyển khoản: chỉ cần chuỗi ngắn WS<code>
     // VD: WSCP142KD8ZF4
@@ -219,6 +226,7 @@ export class BillingService {
   private async createTopupSession(
     workspaceId: string,
     amount: number,
+    initiatedByUserId?: string | null,
   ): Promise<WalletTopupSession> {
     // Tạo code duy nhất (retry vài lần nếu trùng)
     for (let i = 0; i < 5; i++) {
@@ -231,6 +239,7 @@ export class BillingService {
           amount: amount ? amount.toFixed(4) : null,
           status: 'pending',
           provider: 'sepay',
+          initiated_by_id: initiatedByUserId ?? null,
         });
         return this.sessionRepo.save(session);
       }
@@ -247,6 +256,8 @@ export class BillingService {
     amount: number,
     description: string,
     metadata?: Record<string, any>,
+    /** Thành viên tạo phiên nạp (từ session khi webhook apply). */
+    initiatedByUserId?: string | null,
   ): Promise<void> {
     if (!amount || amount <= 0) {
       throw new Error('Topup amount must be greater than 0');
@@ -260,6 +271,7 @@ export class BillingService {
 
     const tx = this.txRepo.create({
       workspace_id: workspaceId,
+      user_id: initiatedByUserId ?? null,
       type: 'topup',
       amount: amount.toFixed(4),
       description,
@@ -313,10 +325,50 @@ export class BillingService {
         topup_session_id: session.id,
         topup_session_code: session.code,
       },
+      session.initiated_by_id ?? undefined,
     );
 
     session.status = 'completed';
     await this.sessionRepo.save(session);
+  }
+
+  /**
+   * Lấy danh sách giao dịch ví (gồm topup, usage token, refund, adjustment) của workspace.
+   * Phân quyền: chỉ Owner hoặc Admin workspace (permission billing.view_transactions) mới gọi được.
+   */
+  async findAllTransactions(
+    workspaceId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      type?: 'topup' | 'usage' | 'refund' | 'adjustment';
+    },
+  ): Promise<PaginatedResult<WalletTransaction>> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(options.limit) || 10));
+    const skip = (page - 1) * limit;
+    const sortBy = options.sortBy ?? 'created_at';
+    const sortOrder = options.sortOrder ?? 'DESC';
+    const allowedSort = ['created_at', 'amount', 'type'].includes(sortBy)
+      ? sortBy
+      : 'created_at';
+
+    const qb = this.txRepo
+      .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.user', 'user')
+      .where('tx.workspace_id = :workspaceId', { workspaceId })
+      .orderBy(`tx.${allowedSort}`, sortOrder)
+      .skip(skip)
+      .take(limit);
+
+    if (options.type) {
+      qb.andWhere('tx.type = :type', { type: options.type });
+    }
+
+    const [data, total] = await qb.getManyAndCount();
+    return createPaginatedResult(data, total, page, limit);
   }
 }
 

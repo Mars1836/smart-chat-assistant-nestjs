@@ -443,7 +443,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
       name: 'google_search',
       display_name: 'Google Search',
       description:
-        'Tìm kiếm trên web qua Google (SerpApi). Chỉ cần cấu hình SERPAPI_API_KEY.',
+        'Tìm kiếm trên web qua Google (SerpApi). Dùng khi câu hỏi cần thông tin thực tế, cập nhật (tin tức, luật, số liệu, định nghĩa…) mà chatbot không chắc chắn hoặc không có trong knowledge. Nếu không có thông tin hãy sử dụng tool google_search',
       category: 'builtin',
       is_enabled: true,
       executor_type: 'generic_api',
@@ -463,7 +463,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
           name: 'search',
           display_name: 'Search',
           description:
-            'Tìm kiếm thông tin trên web. Trả về tiêu đề, snippet và link của các kết quả tìm kiếm.',
+            'Tìm kiếm thông tin trên web. Trả về tiêu đề, snippet và link của các kết quả tìm kiếm. HÃY ƯU TIÊN dùng action này khi câu trả lời không chắc chắn, hoặc khi người dùng hỏi về thông tin mới, số liệu, quy định pháp luật, định nghĩa hoặc kiến thức không nằm trong knowledge hiện có.',
           parameters: {
             type: 'OBJECT',
             properties: {

@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { config } from 'dotenv';
 import { seedTools } from './tools.seed';
+import { seedSystemAdmin } from './system-admin.seed';
+import { seedLlmModels } from './llm-models.seed';
 
 // Load environment variables
 config();
@@ -37,10 +39,19 @@ async function runSeeds(): Promise<void> {
 
     // NOTE: RBAC seeding is now handled automatically by RbacSeedService (OnModuleInit)
     // No manual seeding needed for roles, permissions, and role-permissions
-    console.log('ℹ️  RBAC data will be seeded automatically when app starts (RbacSeedService)');
-    
+    console.log(
+      'ℹ️  RBAC data will be seeded automatically when app starts (RbacSeedService)',
+    );
+
+    // Seed system admin user (system_roles + users)
+    console.log('👤 Seeding system admin user...');
+    await seedSystemAdmin(dataSource);
+
     // Seed built-in tools
     await seedTools(dataSource);
+
+    // Seed LLM models (bảng model + giá input/output)
+    await seedLlmModels(dataSource);
 
     console.log('🎉 All seeds completed successfully!');
   } catch (error) {

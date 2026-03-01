@@ -7,7 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
-import { CreateUserDto, UpdateUserDto } from './dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserStatsSummaryDto,
+  UserStatsByDateQueryDto,
+  UserStatsByDateItemDto,
+} from './dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
@@ -87,9 +93,21 @@ export class UsersService extends BaseService<User> {
   }
 
   /**
-   * Lấy thông tin chi tiết user
+   * Lấy thông tin chi tiết user. Nếu xem user khác (userId !== currentUserId) thì chỉ admin mới được.
    */
-  async findOne(userId: string): Promise<User> {
+  async findOne(userId: string, currentUserId?: string): Promise<User> {
+    if (currentUserId && currentUserId !== userId) {
+      const currentUser = await this.userRepository.findOne({
+        where: { id: currentUserId },
+        relations: ['systemRole'],
+      });
+      if (currentUser?.systemRole?.name !== 'admin') {
+        throw new ForbiddenException(
+          'Chỉ quản trị viên mới được xem thông tin user khác',
+        );
+      }
+    }
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['systemRole'],
@@ -103,6 +121,17 @@ export class UsersService extends BaseService<User> {
   }
 
   /**
+   * Kiểm tra user có phải admin hệ thống không
+   */
+  async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['systemRole'],
+    });
+    return user?.systemRole?.name === 'admin';
+  }
+
+  /**
    * Lấy user theo email
    */
   async findByEmail(email: string): Promise<User | null> {
@@ -113,21 +142,15 @@ export class UsersService extends BaseService<User> {
   }
 
   /**
-   * Cập nhật user
+   * Cập nhật user. Cập nhật user khác (userId !== currentUserId) chỉ dành cho admin.
    */
   async update(
     userId: string,
     updateUserDto: UpdateUserDto,
     currentUserId?: string,
   ): Promise<User> {
-    const user = await this.findOne(userId);
-
-    // Kiểm tra quyền: chỉ có thể update chính mình, trừ khi là admin
-    if (currentUserId && currentUserId !== userId) {
-      // TODO: Check if current user is admin
-      // For now, only allow self-update
-      throw new ForbiddenException('You can only update your own profile');
-    }
+    // findOne đã kiểm tra: xem/sửa user khác chỉ admin
+    const user = await this.findOne(userId, currentUserId);
 
     // Hash password nếu có
     if (updateUserDto.password) {
@@ -164,18 +187,104 @@ export class UsersService extends BaseService<User> {
   }
 
   /**
-   * Xóa user
+   * Xóa user. Không cho xóa chính mình. Xóa user khác chỉ dành cho admin.
    */
   async remove(userId: string, currentUserId?: string): Promise<void> {
-    const user = await this.findOne(userId);
-
-    // Kiểm tra quyền: không cho phép xóa chính mình
     if (currentUserId && currentUserId === userId) {
       throw new ForbiddenException('You cannot delete your own account');
     }
 
-    // TODO: Check if current user is admin
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['systemRole'],
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (currentUserId && currentUserId !== userId) {
+      const currentUser = await this.userRepository.findOne({
+        where: { id: currentUserId },
+        relations: ['systemRole'],
+      });
+      if (currentUser?.systemRole?.name !== 'admin') {
+        throw new ForbiddenException(
+          'Chỉ quản trị viên mới được xóa user khác',
+        );
+      }
+    }
 
     await this.userRepository.remove(user);
+  }
+
+  /**
+   * Thống kê tổng quan user (chỉ admin).
+   */
+  async getStatsSummary(): Promise<UserStatsSummaryDto> {
+    const [total, byRoleRows, newLast7, newLast30] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository
+        .createQueryBuilder('u')
+        .select('r.name', 'roleName')
+        .addSelect('COUNT(u.id)', 'count')
+        .leftJoin('u.systemRole', 'r')
+        .groupBy('r.name')
+        .getRawMany<{ roleName: string | null; count: string }>(),
+      this.userRepository
+        .createQueryBuilder('u')
+        .where('u.created_at >= :since', {
+          since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        })
+        .getCount(),
+      this.userRepository
+        .createQueryBuilder('u')
+        .where('u.created_at >= :since', {
+          since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        })
+        .getCount(),
+    ]);
+
+    const by_role: Record<string, number> = {};
+    for (const row of byRoleRows) {
+      const key = row.roleName ?? 'no_role';
+      by_role[key] = parseInt(row.count, 10);
+    }
+
+    return {
+      total,
+      by_role,
+      new_last_7_days: newLast7,
+      new_last_30_days: newLast30,
+    };
+  }
+
+  /**
+   * Thống kê số user tạo mới theo từng kỳ (day/week/month) trong khoảng from–to (chỉ admin).
+   */
+  async getStatsByDate(
+    query: UserStatsByDateQueryDto,
+  ): Promise<UserStatsByDateItemDto[]> {
+    const to = query.to ? new Date(query.to) : new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const groupBy = query.groupBy ?? 'day';
+
+    const trunc = groupBy === 'month' ? 'month' : groupBy === 'week' ? 'week' : 'day';
+    const qb = this.userRepository
+      .createQueryBuilder('u')
+      .select(`date_trunc('${trunc}', u.created_at)::date`, 'date')
+      .addSelect('COUNT(u.id)', 'count')
+      .where('u.created_at >= :from', { from })
+      .andWhere('u.created_at <= :to', { to })
+      .groupBy(`date_trunc('${trunc}', u.created_at)`)
+      .orderBy('date', 'ASC');
+
+    const rows = await qb.getRawMany<{ date: Date; count: string }>();
+
+    return rows.map((r) => ({
+      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+      count: parseInt(r.count, 10),
+    }));
   }
 }

@@ -176,14 +176,111 @@ export class DocumentParsingService {
   }
 
   /**
-   * Split text into chunks
+   * Split text into chunks – strategy depends on file type.
+   *
+   * - Markdown: tách theo heading (#, ##, ...) rồi char-split trong từng section.
+   * - Text/OCR: tách theo đoạn (\n\n) rồi gộp đoạn cho tới khi đủ dài.
+   * - Khác: fallback dùng RecursiveCharacterTextSplitter.
    */
-  async chunkText(text: string, chunkSize = 1000, chunkOverlap = 200): Promise<string[]> {
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize,
-      chunkOverlap,
-    });
+  async chunkText(
+    text: string,
+    options?: { mimeType?: string; fileName?: string },
+  ): Promise<string[]> {
+    const normalizedMime = options?.mimeType
+      ? this.normalizeMimeType(options.mimeType)
+      : '';
 
-    return await splitter.splitText(text);
+    // Markdown
+    if (normalizedMime === 'text/markdown') {
+      return this.chunkMarkdown(text);
+    }
+
+    // Plain text hoặc OCR (coi như text thường)
+    if (!normalizedMime || normalizedMime === 'text/plain') {
+      return this.chunkByParagraphs(text);
+    }
+
+    // Fallback cho các loại file khác (pdf/docx sau khi extract) – vẫn dùng paragraphs
+    return this.chunkByParagraphs(text);
+  }
+
+  private async chunkMarkdown(text: string): Promise<string[]> {
+    const lines = text.split(/\r?\n/);
+    const sections: string[] = [];
+    let current: string[] = [];
+
+    const flush = () => {
+      if (current.length > 0) {
+        sections.push(current.join('\n').trim());
+        current = [];
+      }
+    };
+
+    for (const line of lines) {
+      if (/^#{1,6}\s+/.test(line)) {
+        // Heading mới → đóng section cũ
+        flush();
+        current.push(line);
+      } else {
+        current.push(line);
+      }
+    }
+    flush();
+
+    // Với mỗi section, nếu quá dài thì tiếp tục chunk theo đoạn
+    const chunks: string[] = [];
+    for (const sec of sections) {
+      const secChunks = await this.chunkByParagraphs(sec, 900, 150);
+      chunks.push(...secChunks);
+    }
+    return chunks;
+  }
+
+  private async chunkByParagraphs(
+    text: string,
+    chunkSize = 900,
+    chunkOverlap = 0, // hiện chưa dùng overlap đoạn để giữ đơn giản
+  ): Promise<string[]> {
+    // Tách theo đoạn: 1+ dòng trống
+    const paragraphs = text
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    if (paragraphs.length === 0) return [];
+
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const p of paragraphs) {
+      // Nếu đoạn dài hơn chunkSize → cắt nhỏ bằng splitter
+      if (p.length > chunkSize * 1.5) {
+        if (current) {
+          chunks.push(current.trim());
+          current = '';
+        }
+        const splitter = new RecursiveCharacterTextSplitter({
+          chunkSize,
+          chunkOverlap,
+        });
+        const sub = await splitter.splitText(p);
+        chunks.push(...sub.map((s) => s.trim()).filter(Boolean));
+        continue;
+      }
+
+      const candidate = current ? `${current}\n\n${p}` : p;
+      if (candidate.length <= chunkSize || !current) {
+        current = candidate;
+      } else {
+        chunks.push(current.trim());
+        current = p;
+      }
+    }
+
+    if (current) {
+      chunks.push(current.trim());
+    }
+
+    return chunks;
   }
 }
