@@ -20,6 +20,7 @@ import { KnowledgeService } from './knowledge.service';
 import { Knowledge } from './entities/knowledge.entity';
 import { CreateKnowledgeDto } from './dto/create-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { KnowledgeStatsSummaryDto } from './dto/knowledge-stats.dto';
 import {
   AddKnowledgeToChatbotDto,
   UpdateChatbotKnowledgeDto,
@@ -30,6 +31,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SystemAdminGuard } from '../users/guards/system-admin.guard';
 
 @ApiTags('knowledge')
 @ApiBearerAuth('JWT-auth')
@@ -181,5 +183,29 @@ export class ChatbotKnowledgeController {
       chatbotId,
       dto.items,
     );
+  }
+}
+
+@ApiTags('knowledge')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, SystemAdminGuard)
+@Controller('admin/knowledge')
+export class KnowledgeAdminController {
+  constructor(private readonly knowledgeService: KnowledgeService) {}
+
+  @Get('stats/summary')
+  @ApiOperation({
+    summary: 'Thống kê tổng quan knowledge bases (chỉ admin hệ thống)',
+    description:
+      'Tổng số knowledge base, tổng documents, tổng dung lượng, phân loại theo status, số knowledge mới 7/30 ngày qua.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thống kê tổng quan knowledge bases',
+    type: KnowledgeStatsSummaryDto,
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin hệ thống' })
+  getStatsSummary(): Promise<KnowledgeStatsSummaryDto> {
+    return this.knowledgeService.getStatsSummary();
   }
 }

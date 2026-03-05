@@ -13,7 +13,7 @@ export class PaymentResponseDto {
   @ApiPropertyOptional({ nullable: true })
   description: string | null;
 
-  @ApiProperty({ enum: ['zalopay', 'momo', 'bank'] })
+  @ApiProperty({ enum: ['sepay', 'zalopay', 'momo', 'bank'] })
   provider: string;
 
   @ApiProperty({ example: 'TXN-2024-001' })

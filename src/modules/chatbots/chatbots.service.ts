@@ -14,7 +14,12 @@ import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
 import { MessageAttachment } from '../messages/entities/message-attachment.entity';
-import { CreateChatbotDto, UpdateChatbotDto, ChatDto } from './dto';
+import {
+  CreateChatbotDto,
+  UpdateChatbotDto,
+  ChatDto,
+  UpdateWidgetConfigDto,
+} from './dto';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagService } from '../rag/rag.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
@@ -23,6 +28,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
+import { LlmModelService } from '../billing/llm-model.service';
 
 @Injectable()
 export class ChatbotsService extends BaseService<Chatbot> {
@@ -45,6 +51,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly toolExecutorService: ToolExecutorService,
     private readonly chatOrchestrator: ChatOrchestratorService,
     private readonly configService: ConfigService,
+    private readonly llmModelService: LlmModelService,
   ) {
     super();
   }
@@ -149,6 +156,45 @@ export class ChatbotsService extends BaseService<Chatbot> {
   }
 
   /**
+   * Lấy cấu hình widget (bao gồm security) cho chatbot
+   */
+  async getWidgetConfig(
+    workspaceId: string,
+    chatbotId: string,
+  ): Promise<Record<string, any> | null> {
+    const chatbot = await this.findOne(workspaceId, chatbotId);
+    return chatbot.widget_config ?? null;
+  }
+
+  /**
+   * Cập nhật cấu hình widget cho chatbot (UI + security)
+   */
+  async updateWidgetConfig(
+    workspaceId: string,
+    chatbotId: string,
+    dto: UpdateWidgetConfigDto,
+  ): Promise<Chatbot> {
+    const chatbot = await this.findOne(workspaceId, chatbotId);
+    const currentConfig = (chatbot.widget_config ?? {}) as Record<string, any>;
+
+    const nextConfig: Record<string, any> = {
+      ...currentConfig,
+      ...(dto.ui !== undefined ? { ui: dto.ui } : {}),
+      ...(dto.security !== undefined
+        ? {
+            security: {
+              ...(currentConfig.security ?? {}),
+              ...dto.security,
+            },
+          }
+        : {}),
+    };
+
+    chatbot.widget_config = nextConfig;
+    return this.chatbotRepo.save(chatbot);
+  }
+
+  /**
    * Xóa chatbot
    */
   async remove(
@@ -157,6 +203,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
     userId: string,
   ): Promise<void> {
     const chatbot = await this.findOne(workspaceId, chatbotId);
+
+    // Xóa toàn bộ conversations (và messages, attachments liên quan) trước
+    // để tránh lỗi foreign key khi xóa chatbot
+    await this.conversationRepo.delete({
+      chatbot_id: chatbot.id,
+      workspace_id: workspaceId,
+    });
+
     await this.chatbotRepo.remove(chatbot);
   }
 
@@ -176,8 +230,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
     uploaded_images: any[];
     cards: any[];
     processingTime: number;
-    token_usage: { input_tokens: number; output_tokens: number };
-    tools_used: { tool_name: string; args: Record<string, any>; result: any }[];
+    token_usage?: { input_tokens: number; output_tokens: number } | null;
+    tools_used?: { tool_name: string; args: Record<string, any>; result: any }[] | null;
   }> {
     const startTime = Date.now();
 
@@ -303,8 +357,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
         uploaded_images: uploadedImages,
         cards: cards || [],
         processingTime,
-        token_usage: tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
-        tools_used: toolsUsed ?? [],
+        token_usage: tokenUsage ?? null,
+        tools_used: toolsUsed?.length ? toolsUsed : null,
       };
     } catch (error) {
       this.logger.error('Error in chat:', error);
@@ -330,8 +384,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
         uploaded_images: uploadedImages,
         cards: [],
         processingTime: Date.now() - startTime,
-        token_usage: { input_tokens: 0, output_tokens: 0 },
-        tools_used: [],
+        token_usage: null,
+        tools_used: null,
       };
     }
   }
@@ -427,6 +481,10 @@ export class ChatbotsService extends BaseService<Chatbot> {
    * List available models
    */
   async listModels(): Promise<string[]> {
-    return await this.aiStudioService.listModels();
+    const rows = await this.llmModelService.findAllForPricing();
+    // Trả về danh sách "provider:model" để FE dễ phân biệt nếu cần
+    return rows.map((row) =>
+      row.provider ? `${row.provider}:${row.model}` : row.model,
+    );
   }
 }

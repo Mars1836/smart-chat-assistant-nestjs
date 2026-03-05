@@ -23,6 +23,7 @@ import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
   WorkspaceResponseDto,
+  WorkspaceStatsSummaryDto,
 } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../common/decorators';
@@ -34,6 +35,7 @@ import {
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
+import { SystemAdminGuard } from '../users/guards/system-admin.guard';
 
 @ApiTags('workspaces')
 @ApiBearerAuth('JWT-auth')
@@ -154,5 +156,29 @@ export class WorkspacesController {
   @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
   getChatbot(@Param('workspaceId') id: string, @User('sub') userId: string) {
     return this.workspacesService.getChatbot(id, userId);
+  }
+}
+
+@ApiTags('workspaces')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, SystemAdminGuard)
+@Controller('admin/workspaces')
+export class WorkspacesAdminController {
+  constructor(private readonly workspacesService: WorkspacesService) {}
+
+  @Get('stats/summary')
+  @ApiOperation({
+    summary: 'Thống kê tổng quan workspaces & chatbots (chỉ admin hệ thống)',
+    description:
+      'Tổng số workspace, tổng số chatbot, trung bình chatbot/workspace, số workspace mới 7/30 ngày qua, số chatbot mới 7/30 ngày qua.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thống kê tổng quan workspaces & chatbots',
+    type: WorkspaceStatsSummaryDto,
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin hệ thống' })
+  getStatsSummary(): Promise<WorkspaceStatsSummaryDto> {
+    return this.workspacesService.getStatsSummary();
   }
 }

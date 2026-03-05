@@ -32,10 +32,10 @@ export class PaymentListQueryDto {
   @IsIn(['pending', 'success', 'failed'])
   status?: 'pending' | 'success' | 'failed';
 
-  @ApiPropertyOptional({ enum: ['zalopay', 'momo', 'bank'] })
+  @ApiPropertyOptional({ enum: ['sepay', 'zalopay', 'momo', 'bank'] })
   @IsOptional()
-  @IsIn(['zalopay', 'momo', 'bank'])
-  provider?: 'zalopay' | 'momo' | 'bank';
+  @IsIn(['sepay', 'zalopay', 'momo', 'bank'])
+  provider?: 'sepay' | 'zalopay' | 'momo' | 'bank';
 
   /** Chỉ admin: lọc theo user_id */
   @ApiPropertyOptional()

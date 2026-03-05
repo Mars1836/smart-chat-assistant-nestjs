@@ -15,7 +15,7 @@ export class Payment extends BaseEntity {
   description: string | null;
 
   @Column({ type: 'varchar', length: 10 })
-  provider: 'zalopay' | 'momo' | 'bank';
+  provider: 'sepay' | 'zalopay' | 'momo' | 'bank';
 
   @Column({ type: 'varchar', length: 100 })
   transaction_id: string;

@@ -5,6 +5,7 @@ import { Knowledge } from './entities/knowledge.entity';
 import { ChatbotKnowledge } from './entities/chatbot-knowledge.entity';
 import { CreateKnowledgeDto } from './dto/create-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
+import { KnowledgeStatsSummaryDto } from './dto/knowledge-stats.dto';
 
 @Injectable()
 export class KnowledgeService {
@@ -226,5 +227,57 @@ export class KnowledgeService {
     }
 
     return results;
+  }
+
+  /**
+   * Thống kê tổng quan knowledge bases trong toàn hệ thống (chỉ admin).
+   */
+  async getStatsSummary(): Promise<KnowledgeStatsSummaryDto> {
+    const now = Date.now();
+    const since7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const since30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      total_knowledge_bases,
+      documentsAndSize,
+      byStatusRows,
+      knowledge_last_7_days,
+      knowledge_last_30_days,
+    ] = await Promise.all([
+      this.knowledgeRepo.count(),
+      this.knowledgeRepo
+        .createQueryBuilder('k')
+        .select('COALESCE(SUM(k.document_count), 0)', 'documents')
+        .addSelect('COALESCE(SUM(k.total_size), 0)', 'size')
+        .getRawOne<{ documents: string; size: string }>(),
+      this.knowledgeRepo
+        .createQueryBuilder('k')
+        .select('k.status', 'status')
+        .addSelect('COUNT(k.id)', 'count')
+        .groupBy('k.status')
+        .getRawMany<{ status: string; count: string }>(),
+      this.knowledgeRepo
+        .createQueryBuilder('k')
+        .where('k.created_at >= :since', { since: since7Days })
+        .getCount(),
+      this.knowledgeRepo
+        .createQueryBuilder('k')
+        .where('k.created_at >= :since', { since: since30Days })
+        .getCount(),
+    ]);
+
+    const by_status: Record<string, number> = {};
+    for (const row of byStatusRows) {
+      by_status[row.status] = parseInt(row.count, 10);
+    }
+
+    return {
+      total_knowledge_bases,
+      total_documents: parseInt(documentsAndSize?.documents ?? '0', 10),
+      total_size: documentsAndSize?.size ?? '0',
+      by_status,
+      knowledge_last_7_days,
+      knowledge_last_30_days,
+    };
   }
 }

@@ -10,9 +10,11 @@ import { BillingModule } from '../billing/billing.module';
 import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { OpenAIProvider } from '../../common/providers/openai.provider';
+import { RedisRateLimiterService } from '../../common/rate-limiter/redis-rate-limiter.service';
 import { WidgetController } from './widget.controller';
 import { WidgetService } from './widget.service';
 import { WidgetChatOrchestratorService } from './widget-chat-orchestrator.service';
+import { WidgetSecurityService } from './widget-security.service';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { WidgetChatOrchestratorService } from './widget-chat-orchestrator.servic
   providers: [
     WidgetService,
     WidgetChatOrchestratorService,
+    RedisRateLimiterService,
+    WidgetSecurityService,
     // LLM providers (riêng cho widget)
     LLMFactoryService,
     GeminiProvider,

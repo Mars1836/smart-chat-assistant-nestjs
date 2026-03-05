@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { WorkspaceWallet } from './entities/workspace-wallet.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { WalletTopupSession } from './entities/wallet-topup-session.entity';
+import { Payment } from '../payments/entities/payment.entity';
 import { ConfigService } from '@nestjs/config';
 import { LlmModelService } from './llm-model.service';
 import { Observable, Subject } from 'rxjs';
@@ -27,6 +28,8 @@ export class BillingService {
     private readonly txRepo: Repository<WalletTransaction>,
     @InjectRepository(WalletTopupSession)
     private readonly sessionRepo: Repository<WalletTopupSession>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
     private readonly llmModelService: LlmModelService,
     private readonly configService: ConfigService,
   ) {}
@@ -283,6 +286,32 @@ export class BillingService {
     });
 
     await this.txRepo.save(tx);
+
+    // Ghi thêm bản ghi Payment để admin hệ thống quản lý giao dịch SePay
+    if (initiatedByUserId) {
+      const meta = metadata || {};
+      const sepayId =
+        (meta as any).sepay_id !== undefined
+          ? String((meta as any).sepay_id)
+          : undefined;
+      const transactionId =
+        sepayId ||
+        (meta as any).referenceCode ||
+        (meta as any).code ||
+        (meta as any).topup_session_code ||
+        `SEPAY-${Date.now()}`;
+
+      const payment = this.paymentRepo.create({
+        user: { id: initiatedByUserId } as any,
+        amount: amount.toFixed(2),
+        description,
+        provider: 'sepay',
+        transaction_id: transactionId,
+        status: 'success',
+      });
+
+      await this.paymentRepo.save(payment);
+    }
 
     // Phát SSE để FE biết ví đã tăng tiền
     await this.emitWalletSnapshot(workspaceId);

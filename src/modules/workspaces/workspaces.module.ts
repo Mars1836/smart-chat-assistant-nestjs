@@ -6,12 +6,18 @@ import { Workspace } from './entities/workspace.entity';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
 import { WorkspaceMember } from '../workspace-members/entities/workspace-member.entity';
 import { WorkspaceRole } from '../workspace-roles/entities/workspace-role.entity';
-import { WorkspacesController } from './workspaces.controller';
+import {
+  WorkspacesController,
+  WorkspacesAdminController,
+} from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
+import { UsersModule } from '../users/users.module';
+import { SystemAdminGuard } from '../users/guards/system-admin.guard';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Workspace, Chatbot, WorkspaceMember, WorkspaceRole]),
+    UsersModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -24,8 +30,8 @@ import { WorkspacesService } from './workspaces.service';
       inject: [ConfigService],
     }),
   ],
-  controllers: [WorkspacesController],
-  providers: [WorkspacesService],
+  controllers: [WorkspacesController, WorkspacesAdminController],
+  providers: [WorkspacesService, SystemAdminGuard],
   exports: [TypeOrmModule, WorkspacesService],
 })
 export class WorkspacesModule {}

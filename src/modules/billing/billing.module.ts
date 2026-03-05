@@ -6,6 +6,7 @@ import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { WalletTopupSession } from './entities/wallet-topup-session.entity';
 import { LlmModel } from './entities/llm-model.entity';
 import { BillingService } from './billing.service';
+import { Payment } from '../payments/entities/payment.entity';
 import { BillingController } from './billing.controller';
 import { LlmModelService } from './llm-model.service';
 import { LlmModelsController } from './llm-models.controller';
@@ -19,6 +20,7 @@ import { UsersModule } from '../users/users.module';
       WalletTransaction,
       WalletTopupSession,
       LlmModel,
+      Payment,
     ]),
     ConfigModule,
     forwardRef(() => AuthModule),

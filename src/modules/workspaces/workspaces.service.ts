@@ -15,6 +15,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { WORKSPACE_ROLES } from '../../common/constants/permissions.constant';
+import { WorkspaceStatsSummaryDto } from './dto';
 
 @Injectable()
 export class WorkspacesService extends BaseService<Workspace> {
@@ -219,5 +220,55 @@ export class WorkspacesService extends BaseService<Workspace> {
     }
 
     return chatbot;
+  }
+
+  /**
+   * Thống kê tổng quan workspaces & chatbots (dành cho admin hệ thống).
+   */
+  async getStatsSummary(): Promise<WorkspaceStatsSummaryDto> {
+    const now = Date.now();
+    const since7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const since30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      total_workspaces,
+      total_chatbots,
+      workspaces_last_7_days,
+      workspaces_last_30_days,
+      chatbots_last_7_days,
+      chatbots_last_30_days,
+    ] = await Promise.all([
+      this.workspaceRepository.count(),
+      this.chatbotRepository.count(),
+      this.workspaceRepository
+        .createQueryBuilder('w')
+        .where('w.created_at >= :since', { since: since7Days })
+        .getCount(),
+      this.workspaceRepository
+        .createQueryBuilder('w')
+        .where('w.created_at >= :since', { since: since30Days })
+        .getCount(),
+      this.chatbotRepository
+        .createQueryBuilder('c')
+        .where('c.created_at >= :since', { since: since7Days })
+        .getCount(),
+      this.chatbotRepository
+        .createQueryBuilder('c')
+        .where('c.created_at >= :since', { since: since30Days })
+        .getCount(),
+    ]);
+
+    const avg_chatbots_per_workspace =
+      total_workspaces > 0 ? total_chatbots / total_workspaces : 0;
+
+    return {
+      total_workspaces,
+      total_chatbots,
+      avg_chatbots_per_workspace,
+      workspaces_last_7_days,
+      workspaces_last_30_days,
+      chatbots_last_7_days,
+      chatbots_last_30_days,
+    };
   }
 }

@@ -29,6 +29,7 @@ import {
   UpdateChatbotDto,
   ChatDto,
   ChatResponseDto,
+  UpdateWidgetConfigDto,
 } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../common/decorators';
@@ -177,6 +178,51 @@ export class ChatbotsController {
     @User('sub') userId: string,
   ) {
     return this.chatbotsService.remove(workspaceId, id, userId);
+  }
+
+  @Get(':id/widget-config')
+  @ApiOperation({
+    summary: 'Lấy cấu hình widget (UI + bảo mật) cho chatbot',
+    description:
+      'Trả về cấu hình widget gắn với chatbot, bao gồm whitelist domain/IP, API key và rate limit.\n' +
+      'Dùng cho trang admin FE để hiển thị và chỉnh sửa cấu hình widget public.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Widget config',
+    type: Object,
+  })
+  @ApiResponse({ status: 404, description: 'Chatbot not found' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
+  getWidgetConfig(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+  ) {
+    return this.chatbotsService.getWidgetConfig(workspaceId, id);
+  }
+
+  @Patch(':id/widget-config')
+  @ApiOperation({
+    summary: 'Cập nhật cấu hình widget (UI + bảo mật) cho chatbot',
+    description:
+      'Cập nhật cấu hình widget cho chatbot, bao gồm:\n' +
+      '- Cấu hình UI (màu sắc, vị trí, title, greeting...).\n' +
+      '- Cấu hình security: whitelist domain/IP, public API key, rate limit.\n' +
+      'Endpoint này chỉ dành cho trang admin nội bộ, yêu cầu JWT + quyền CHATBOT_UPDATE.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Widget config updated',
+    type: Chatbot,
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
+  updateWidgetConfig(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateWidgetConfigDto,
+  ) {
+    return this.chatbotsService.updateWidgetConfig(workspaceId, id, dto);
   }
 
   @Post(':id/chat')
