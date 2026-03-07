@@ -19,12 +19,15 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { SystemRole } from '../system-roles/entities/system-role.entity';
 
 @Injectable()
 export class UsersService extends BaseService<User> {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(SystemRole)
+    private readonly systemRoleRepository: Repository<SystemRole>,
     private readonly configService: ConfigService,
   ) {
     super();
@@ -40,7 +43,7 @@ export class UsersService extends BaseService<User> {
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Kiểm tra email đã tồn tại
     const existingUser = await this.userRepository.findOne({
-      where: { email: createUserDto.email },
+      where: { email: createUserDto.email, is_deleted: false },
     });
 
     if (existingUser) {
@@ -57,6 +60,22 @@ export class UsersService extends BaseService<User> {
 
     // Tạo user
     // created_by_id sẽ được tự động thêm bởi BaseEntitySubscriber
+    let systemRoleId = createUserDto.system_role_id ?? null;
+    if (!systemRoleId) {
+      let defaultUserRole = await this.systemRoleRepository.findOne({
+        where: { name: 'user' },
+      });
+      if (!defaultUserRole) {
+        defaultUserRole = await this.systemRoleRepository.save(
+          this.systemRoleRepository.create({
+            name: 'user',
+            description: 'Người dùng mặc định của hệ thống',
+          }),
+        );
+      }
+      systemRoleId = defaultUserRole.id;
+    }
+
     const user = this.userRepository.create({
       name: createUserDto.name,
       email: createUserDto.email,
@@ -64,7 +83,7 @@ export class UsersService extends BaseService<User> {
       google_id: createUserDto.google_id ?? null,
       avatar_url: createUserDto.avatar_url ?? null,
       language: createUserDto.language ?? 'vi',
-      system_role_id: createUserDto.system_role_id ?? null,
+      system_role_id: systemRoleId,
     });
 
     return await this.userRepository.save(user);
@@ -81,6 +100,7 @@ export class UsersService extends BaseService<User> {
     }
 
     return this.paginate(pagination, {
+      where: { is_deleted: false } as any,
       relations: ['systemRole'],
     });
   }
@@ -98,7 +118,7 @@ export class UsersService extends BaseService<User> {
   async findOne(userId: string, currentUserId?: string): Promise<User> {
     if (currentUserId && currentUserId !== userId) {
       const currentUser = await this.userRepository.findOne({
-        where: { id: currentUserId },
+        where: { id: currentUserId, is_deleted: false },
         relations: ['systemRole'],
       });
       if (currentUser?.systemRole?.name !== 'admin') {
@@ -109,7 +129,7 @@ export class UsersService extends BaseService<User> {
     }
 
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id: userId, is_deleted: false },
       relations: ['systemRole'],
     });
 
@@ -125,7 +145,7 @@ export class UsersService extends BaseService<User> {
    */
   async isAdmin(userId: string): Promise<boolean> {
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id: userId, is_deleted: false },
       relations: ['systemRole'],
     });
     return user?.systemRole?.name === 'admin';
@@ -136,7 +156,7 @@ export class UsersService extends BaseService<User> {
    */
   async findByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findOne({
-      where: { email },
+      where: { email, is_deleted: false },
       relations: ['systemRole'],
     });
   }
@@ -195,7 +215,7 @@ export class UsersService extends BaseService<User> {
     }
 
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id: userId, is_deleted: false },
       relations: ['systemRole'],
     });
     if (!user) {
@@ -204,7 +224,7 @@ export class UsersService extends BaseService<User> {
 
     if (currentUserId && currentUserId !== userId) {
       const currentUser = await this.userRepository.findOne({
-        where: { id: currentUserId },
+        where: { id: currentUserId, is_deleted: false },
         relations: ['systemRole'],
       });
       if (currentUser?.systemRole?.name !== 'admin') {
@@ -214,7 +234,8 @@ export class UsersService extends BaseService<User> {
       }
     }
 
-    await this.userRepository.remove(user);
+    user.is_deleted = true;
+    await this.userRepository.save(user);
   }
 
   /**
@@ -222,23 +243,26 @@ export class UsersService extends BaseService<User> {
    */
   async getStatsSummary(): Promise<UserStatsSummaryDto> {
     const [total, byRoleRows, newLast7, newLast30] = await Promise.all([
-      this.userRepository.count(),
+      this.userRepository.count({ where: { is_deleted: false } }),
       this.userRepository
         .createQueryBuilder('u')
         .select('r.name', 'roleName')
         .addSelect('COUNT(u.id)', 'count')
         .leftJoin('u.systemRole', 'r')
+        .where('u.is_deleted = :isDeleted', { isDeleted: false })
         .groupBy('r.name')
         .getRawMany<{ roleName: string | null; count: string }>(),
       this.userRepository
         .createQueryBuilder('u')
-        .where('u.created_at >= :since', {
+        .where('u.is_deleted = :isDeleted', { isDeleted: false })
+        .andWhere('u.created_at >= :since', {
           since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         })
         .getCount(),
       this.userRepository
         .createQueryBuilder('u')
-        .where('u.created_at >= :since', {
+        .where('u.is_deleted = :isDeleted', { isDeleted: false })
+        .andWhere('u.created_at >= :since', {
           since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         })
         .getCount(),
@@ -275,7 +299,8 @@ export class UsersService extends BaseService<User> {
       .createQueryBuilder('u')
       .select(`date_trunc('${trunc}', u.created_at)::date`, 'date')
       .addSelect('COUNT(u.id)', 'count')
-      .where('u.created_at >= :from', { from })
+      .where('u.is_deleted = :isDeleted', { isDeleted: false })
+      .andWhere('u.created_at >= :from', { from })
       .andWhere('u.created_at <= :to', { to })
       .groupBy(`date_trunc('${trunc}', u.created_at)`)
       .orderBy('date', 'ASC');

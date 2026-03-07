@@ -7,6 +7,7 @@ import { config } from 'dotenv';
 import { seedTools } from './tools.seed';
 import { seedSystemAdmin } from './system-admin.seed';
 import { seedLlmModels } from './llm-models.seed';
+import { seedDefaultUserRole } from './default-user-role.seed';
 
 // Load environment variables
 config();
@@ -46,6 +47,10 @@ async function runSeeds(): Promise<void> {
     // Seed system admin user (system_roles + users)
     console.log('👤 Seeding system admin user...');
     await seedSystemAdmin(dataSource);
+
+    // Ensure role "user" exists and backfill users without role
+    console.log('👥 Seeding default user role...');
+    await seedDefaultUserRole(dataSource);
 
     // Seed built-in tools
     await seedTools(dataSource);

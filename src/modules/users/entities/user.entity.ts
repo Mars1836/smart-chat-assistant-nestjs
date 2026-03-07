@@ -25,6 +25,9 @@ export class User extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   system_role_id: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  is_deleted: boolean;
+
   // Relations
   @ManyToOne(() => SystemRole, (role) => role.users, { nullable: true })
   @JoinColumn({ name: 'system_role_id' })

@@ -59,7 +59,7 @@ export class WorkspaceInvitationsService {
 
     // Check if user exists (optional - they might not be registered yet)
     const existingUser = await this.userRepo.findOne({
-      where: { email: inviteDto.email },
+      where: { email: inviteDto.email, is_deleted: false },
     });
 
     // If user exists, check if already a member
@@ -97,7 +97,9 @@ export class WorkspaceInvitationsService {
       const updated = await this.invitationRepo.save(existingInvitation);
 
       // Get inviter info
-      const inviter = await this.userRepo.findOne({ where: { id: inviterId } });
+      const inviter = await this.userRepo.findOne({
+        where: { id: inviterId, is_deleted: false },
+      });
       const inviterName = inviter?.name ?? 'Someone';
       const inviterEmail = inviter?.email ?? '';
 
@@ -121,7 +123,9 @@ export class WorkspaceInvitationsService {
     const saved = await this.invitationRepo.save(invitation);
 
     // Get inviter info
-    const inviter = await this.userRepo.findOne({ where: { id: inviterId } });
+    const inviter = await this.userRepo.findOne({
+      where: { id: inviterId, is_deleted: false },
+    });
     const inviterName = inviter?.name ?? 'Someone';
     const inviterEmail = inviter?.email ?? '';
 
@@ -163,7 +167,7 @@ export class WorkspaceInvitationsService {
 
     // Find user
     const user = await this.userRepo.findOne({
-      where: { id: userId },
+      where: { id: userId, is_deleted: false },
     });
 
     if (!user) {
@@ -329,7 +333,9 @@ export class WorkspaceInvitationsService {
     await this.invitationRepo.save(invitation);
 
     // Get inviter info
-    const inviter = await this.userRepo.findOne({ where: { id: invitation.invited_by } });
+    const inviter = await this.userRepo.findOne({
+      where: { id: invitation.invited_by, is_deleted: false },
+    });
     const inviterName = inviter?.name ?? 'Someone';
     const inviterEmail = inviter?.email ?? '';
 
@@ -378,7 +384,9 @@ export class WorkspaceInvitationsService {
     await this.invitationRepo.save(invitation);
 
     // Get inviter info
-    const inviter = await this.userRepo.findOne({ where: { id: invitation.invited_by } });
+    const inviter = await this.userRepo.findOne({
+      where: { id: invitation.invited_by, is_deleted: false },
+    });
     const inviterName = inviter?.name ?? 'Someone';
     const inviterEmail = inviter?.email ?? '';
 

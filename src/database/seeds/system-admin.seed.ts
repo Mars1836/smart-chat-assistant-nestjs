@@ -45,8 +45,9 @@ export async function seedSystemAdmin(dataSource: DataSource): Promise<void> {
 
   if (adminUser) {
     // Nếu user đã có nhưng chưa gán role, gán role admin
-    if (!adminUser.system_role_id) {
+    if (!adminUser.system_role_id || adminUser.is_deleted) {
       adminUser.system_role_id = adminRole.id;
+      adminUser.is_deleted = false;
       await userRepo.save(adminUser);
       console.log(`  ↻ Updated existing user to admin role: ${adminEmail}`);
     } else {
