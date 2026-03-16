@@ -7,10 +7,8 @@ import { UsersModule } from './modules/users/users.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { MessagesModule } from './modules/messages/messages.module';
-import { IntentsModule } from './modules/intents/intents.module';
 import { ActionsModule } from './modules/actions/actions.module';
 import { DocumentsModule } from './modules/documents/documents.module';
-import { EventsModule } from './modules/events/events.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { WorkspaceMembersModule } from './modules/workspace-members/workspace-members.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -23,7 +21,6 @@ import { WorkspaceInvitationsModule } from './modules/workspace-invitations/work
 import { RbacSeedModule } from './modules/rbac-seed/rbac-seed.module';
 import { ChatbotsModule } from './modules/chatbots/chatbots.module';
 import { RagModule } from './modules/rag/rag.module';
-import { CustomIntentsModule } from './modules/custom-intents/custom-intents.module';
 import { CustomResponsesModule } from './modules/custom-responses/custom-responses.module';
 import { TrainingDataModule } from './modules/training-data/training-data.module';
 import { BaseEntitySubscriber } from './common/subscribers';
@@ -88,17 +85,14 @@ import { StorageModule } from './common/storage';
     KnowledgeModule,
     ToolsModule,
     WidgetModule,
-    CustomIntentsModule,
     CustomResponsesModule,
     TrainingDataModule,
     // Chat Modules
     ConversationsModule,
     MessagesModule,
-    IntentsModule,
     ActionsModule,
     // Integration Modules
     DocumentsModule,
-    EventsModule,
     PaymentsModule,
     // Auth & Mail Modules
     AuthModule,

@@ -4,8 +4,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { pipeline } from 'stream/promises';
 
 type GcsFileRef = {
   bucket: string;
@@ -49,6 +51,38 @@ export class DocumentStorageService {
     return `/uploads/documents/${workspaceId}/${fileName}`;
   }
 
+  async uploadDocumentFromPath(
+    workspaceId: string,
+    fileName: string,
+    sourcePath: string,
+    contentType?: string,
+  ): Promise<string> {
+    if (this.getDriver() === 'gcs') {
+      const bucket = this.getGcsBucket();
+      const objectPath = this.buildObjectPath(workspaceId, fileName);
+      const file = bucket.file(objectPath);
+      const writeStream = file.createWriteStream({
+        resumable: true,
+        contentType,
+        metadata: {
+          cacheControl: 'private, max-age=0, no-transform',
+        },
+      });
+
+      await pipeline(fsSync.createReadStream(sourcePath), writeStream);
+      return `gs://${this.getBucketName()}/${objectPath}`;
+    }
+
+    const targetDir = path.join(
+      process.cwd(),
+      'uploads',
+      'documents',
+      workspaceId,
+    );
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.copyFile(sourcePath, path.join(targetDir, fileName));
+    return `/uploads/documents/${workspaceId}/${fileName}`;
+  }
   async readDocument(fileRef: string): Promise<Buffer> {
     if (this.isGcsRef(fileRef)) {
       const { bucket, objectPath } = this.parseGcsRef(fileRef);
@@ -178,3 +212,5 @@ export class DocumentStorageService {
     }
   }
 }
+
+

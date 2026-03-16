@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import { WorkspaceEncryptionKey } from './entities/workspace-encryption-key.entity';
 
 /** Magic header để nhận diện file đã mã hóa */
@@ -272,6 +273,63 @@ export class WorkspaceEncryptionService implements OnModuleInit {
         }
       }
     }
+  }
+
+  async hasWorkspaceDek(workspaceId: string): Promise<boolean> {
+    const dek = await this.getPlaintextDek(workspaceId);
+    return dek != null;
+  }
+
+  async encryptFileToPath(
+    workspaceId: string,
+    sourcePath: string,
+    targetPath: string,
+  ): Promise<boolean> {
+    const dek = await this.getPlaintextDek(workspaceId);
+    if (!dek) return false;
+
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, dek, iv);
+
+    await new Promise<void>((resolve, reject) => {
+      const readStream = fs.createReadStream(sourcePath);
+      const writeStream = fs.createWriteStream(targetPath);
+      let settled = false;
+
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        readStream.destroy();
+        cipher.destroy();
+        writeStream.destroy();
+        reject(error);
+      };
+
+      readStream.on('error', fail);
+      cipher.on('error', fail);
+      writeStream.on('error', fail);
+
+      writeStream.write(ENC_MAGIC);
+      writeStream.write(iv);
+
+      readStream.pipe(cipher).pipe(writeStream, { end: false });
+
+      cipher.on('end', () => {
+        try {
+          writeStream.end(cipher.getAuthTag());
+        } catch (error) {
+          fail(error);
+        }
+      });
+
+      writeStream.on('finish', () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      });
+    });
+
+    return true;
   }
 
   /**

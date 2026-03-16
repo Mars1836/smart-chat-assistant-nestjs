@@ -68,9 +68,7 @@ export class MessagesService extends BaseService<Message> {
       sender_type: createMessageDto.sender_type,
       sender: createMessageDto.sender_type === 'user' ? { id: userId } : null,
       content: createMessageDto.content,
-      intent: createMessageDto.intent_id
-        ? { id: createMessageDto.intent_id }
-        : null,
+      intent_id: createMessageDto.intent_id ?? null,
     });
 
     return await this.messageRepository.save(message);
@@ -118,7 +116,7 @@ export class MessagesService extends BaseService<Message> {
 
     return this.paginate(messagesPagination, {
       where: { conversation: { id: conversationId } },
-      relations: ['sender', 'intent', 'attachments'],
+      relations: ['sender', 'attachments'],
     });
   }
 
@@ -128,7 +126,7 @@ export class MessagesService extends BaseService<Message> {
   async findOne(messageId: string, userId: string): Promise<Message> {
     const message = await this.messageRepository.findOne({
       where: { id: messageId },
-      relations: ['conversation', 'conversation.workspace', 'sender', 'intent'],
+      relations: ['conversation', 'conversation.workspace', 'sender'],
     });
 
     if (!message) {
@@ -179,9 +177,7 @@ export class MessagesService extends BaseService<Message> {
     }
 
     if (updateMessageDto.intent_id !== undefined) {
-      message.intent = updateMessageDto.intent_id
-        ? ({ id: updateMessageDto.intent_id } as any)
-        : null;
+      message.intent_id = updateMessageDto.intent_id ?? null;
     }
 
     return await this.messageRepository.save(message);

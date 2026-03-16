@@ -39,10 +39,13 @@ export class KnowledgeService {
   }
 
   async findOneByWorkspace(workspaceId: string, id: string): Promise<Knowledge> {
-    const knowledge = await this.knowledgeRepo.findOne({
-      where: { id, workspace_id: workspaceId },
-      relations: ['documents'],
-    });
+    const knowledge = await this.knowledgeRepo
+      .createQueryBuilder('knowledge')
+      .leftJoinAndSelect('knowledge.documents', 'documents')
+      .where('knowledge.id = :id', { id })
+      .andWhere('knowledge.workspace_id = :workspaceId', { workspaceId })
+      .orderBy('documents.uploaded_at', 'DESC')
+      .getOne();
     if (!knowledge) {
       throw new NotFoundException(`Knowledge base not found: ${id}`);
     }

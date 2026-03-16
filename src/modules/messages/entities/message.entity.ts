@@ -2,7 +2,6 @@ import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Conversation } from '../../conversations/entities/conversation.entity';
 import { User } from '../../users/entities/user.entity';
-import { Intent } from '../../intents/entities/intent.entity';
 import { MessageAttachment } from './message-attachment.entity';
 
 @Entity({ name: 'messages' })
@@ -19,8 +18,8 @@ export class Message extends BaseEntity {
   @Column({ type: 'text' })
   content: string;
 
-  @ManyToOne(() => Intent, { nullable: true })
-  intent: Intent | null;
+  @Column({ type: 'uuid', nullable: true })
+  intent_id: string | null;
 
   @OneToMany(() => MessageAttachment, (attachment) => attachment.message, {
     cascade: true,

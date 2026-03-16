@@ -12,6 +12,7 @@ import { CreateDocumentDto, UpdateDocumentDto } from './dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DocumentStorageService } from '../../common/storage';
 import { RagService } from '../rag/rag.service';
@@ -70,27 +71,39 @@ export class DocumentsService extends BaseService<Document> {
     // Create unique filename
     const ext = path.extname(file.originalname);
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-
-    // Mã hóa nội dung nếu workspace có DEK (bỏ qua nếu Vault/DEK lỗi)
-    let contentToWrite: Buffer = file.buffer;
+    let fileRef: string;
+    let encryptedTempPath: string | null = null;
     try {
-      const encrypted = await this.workspaceEncryptionService.encryptContent(
-        workspaceId,
-        file.buffer,
-      );
-      if (encrypted) {
-        contentToWrite = encrypted;
+      const sourcePath = file.path;
+      let uploadPath = sourcePath;
+      try {
+        encryptedTempPath = `${sourcePath}.enc`;
+        const encrypted = await this.workspaceEncryptionService.encryptFileToPath(
+          workspaceId,
+          sourcePath,
+          encryptedTempPath,
+        );
+        if (encrypted) {
+          uploadPath = encryptedTempPath;
+        }
+      } catch {
+        // Vault/DEK or stream encryption error: continue with plaintext upload
       }
-    } catch {
-      // Vault/DEK lỗi: upload plaintext, không fail
-    }
 
-    const fileRef = await this.documentStorageService.uploadDocument(
-      workspaceId,
-      uniqueName,
-      contentToWrite,
-      file.mimetype,
-    );
+      fileRef = await this.documentStorageService.uploadDocumentFromPath(
+        workspaceId,
+        uniqueName,
+        uploadPath,
+        file.mimetype,
+      );
+    } finally {
+      if (encryptedTempPath) {
+        await fs.unlink(encryptedTempPath).catch(() => undefined);
+      }
+      if (file.path) {
+        await fs.unlink(file.path).catch(() => undefined);
+      }
+    }
 
     // Determine file type
     const fileType = createDto.type || ext.replace('.', '').toLowerCase();
@@ -373,3 +386,6 @@ export class DocumentsService extends BaseService<Document> {
     return map[type.toLowerCase()] || 'application/octet-stream';
   }
 }
+
+
+

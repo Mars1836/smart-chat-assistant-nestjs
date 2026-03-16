@@ -18,6 +18,7 @@ import {
 import { Observable } from 'rxjs';
 import { RagEventsService } from '../rag/services/rag-events.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import {
   ApiTags,
   ApiOperation,
@@ -49,6 +50,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const DOCUMENT_UPLOAD_MAX_SIZE = 50 * 1024 * 1024;
+const DOCUMENT_TEMP_DIR = path.join(process.cwd(), 'uploads', 'temp-documents');
+
+function ensureDocumentTempDir() {
+  if (!fs.existsSync(DOCUMENT_TEMP_DIR)) {
+    fs.mkdirSync(DOCUMENT_TEMP_DIR, { recursive: true });
+  }
+}
 
 @ApiTags('documents')
 @Controller('workspaces/:workspaceId/documents')
@@ -62,7 +74,24 @@ export class DocumentsController {
   @Post()
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => {
+          ensureDocumentTempDir();
+          cb(null, DOCUMENT_TEMP_DIR);
+        },
+        filename: (_req, file, cb) => {
+          const ext = path.extname(file.originalname);
+          const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+          cb(null, uniqueName);
+        },
+      }),
+      limits: {
+        fileSize: DOCUMENT_UPLOAD_MAX_SIZE,
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload document mới cho workspace' })
   @ApiBody({
@@ -73,7 +102,7 @@ export class DocumentsController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'File để upload (max 10MB)',
+          description: 'File upload (max 50MB)',
         },
         file_name: {
           type: 'string',
@@ -100,7 +129,7 @@ export class DocumentsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+          new MaxFileSizeValidator({ maxSize: DOCUMENT_UPLOAD_MAX_SIZE })
         ],
       }),
     )
@@ -330,3 +359,4 @@ export class DocumentsController {
     return this.ragEventsService.subscribeToDocument(id);
   }
 }
+
