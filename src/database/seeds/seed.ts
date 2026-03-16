@@ -8,6 +8,7 @@ import { seedTools } from './tools.seed';
 import { seedSystemAdmin } from './system-admin.seed';
 import { seedLlmModels } from './llm-models.seed';
 import { seedDefaultUserRole } from './default-user-role.seed';
+import { seedWorkspaceEncryptionKeys } from './workspace-encryption-keys.seed';
 
 // Load environment variables
 config();
@@ -57,6 +58,10 @@ async function runSeeds(): Promise<void> {
 
     // Seed LLM models (bảng model + giá input/output)
     await seedLlmModels(dataSource);
+
+    // Envelope Encryption: KEK trong Vault Transit + DEK (encrypted) per workspace
+    console.log('🔐 Seeding workspace encryption keys (Vault Transit)...');
+    await seedWorkspaceEncryptionKeys(dataSource);
 
     console.log('🎉 All seeds completed successfully!');
   } catch (error) {

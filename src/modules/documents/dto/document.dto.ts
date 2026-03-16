@@ -63,8 +63,8 @@ export class DocumentResponseDto {
   file_name: string;
 
   @ApiProperty({
-    description: 'URL để download file',
-    example: '/uploads/documents/abc123.pdf',
+    description: 'Tham chiếu storage của file',
+    example: 'gs://my-chatbot-bucket/documents/workspace-id/abc123.pdf',
   })
   file_url: string;
 

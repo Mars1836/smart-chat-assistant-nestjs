@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { DocumentVector } from '../entities/document-vector.entity';
 import { QdrantService } from './qdrant.service';
 import { Document } from '../../documents/entities/document.entity';
+import { WorkspaceEncryptionService } from '../../workspaces/workspace-encryption.service';
 
 @Injectable()
 export class VectorStoreService {
@@ -15,6 +16,7 @@ export class VectorStoreService {
     @InjectRepository(Document)
     private readonly documentRepo: Repository<Document>,
     private readonly qdrantService: QdrantService,
+    private readonly workspaceEncryptionService: WorkspaceEncryptionService,
   ) {}
 
   /**
@@ -106,14 +108,52 @@ export class VectorStoreService {
       // Search in Qdrant
       const results = await this.qdrantService.search(embedding, limit, filter);
 
-      // Map results
-      const mappedResults = results.map((hit) => ({
-        id: hit.id,
-        content: hit.payload.content as string,
-        metadata: hit.payload as Record<string, any>,
-        document_id: hit.payload.document_id as string,
-        similarity: hit.score,
-      }));
+      // Map results & giải mã content nếu đã mã hóa (bỏ qua nếu chưa mã hóa)
+      const documentIds = [
+        ...new Set(results.map((h) => h.payload.document_id as string)),
+      ];
+      const documents =
+        documentIds.length > 0
+          ? await this.documentRepo.find({
+              where: { id: In(documentIds) },
+              select: ['id', 'workspace_id'],
+            })
+          : [];
+      const docToWorkspace = new Map(
+        documents.map((d) => [d.id, d.workspace_id]),
+      );
+
+      const mappedResults = await Promise.all(
+        results.map(async (hit) => {
+          let content = hit.payload.content as string;
+          const documentId = hit.payload.document_id as string;
+          const workspaceId = docToWorkspace.get(documentId);
+          if (
+            workspaceId &&
+            content?.startsWith(WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX)
+          ) {
+            try {
+              const decrypted =
+                await this.workspaceEncryptionService.decryptString(
+                  workspaceId,
+                  content,
+                );
+              if (decrypted !== null) content = decrypted;
+              // decrypt null: Vault/DEK lỗi → dùng chuỗi rỗng, không poison context
+              else content = '';
+            } catch {
+              content = '';
+            }
+          }
+          return {
+            id: hit.id,
+            content,
+            metadata: hit.payload as Record<string, any>,
+            document_id: documentId,
+            similarity: hit.score,
+          };
+        }),
+      );
 
       // Filter by minScore if provided
       if (options?.minScore) {

@@ -9,3 +9,4 @@ export * from './utils';
 export * from './entities';
 export * from './subscribers';
 export * from './services';
+export * from './storage';

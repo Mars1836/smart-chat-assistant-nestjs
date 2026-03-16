@@ -9,10 +9,12 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { RagModule } from '../rag/rag.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Document, Workspace, Knowledge]),
+    WorkspacesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

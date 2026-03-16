@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   InternalServerErrorException,
@@ -16,9 +17,12 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { WORKSPACE_ROLES } from '../../common/constants/permissions.constant';
 import { WorkspaceStatsSummaryDto } from './dto';
+import { WorkspaceEncryptionService } from './workspace-encryption.service';
 
 @Injectable()
 export class WorkspacesService extends BaseService<Workspace> {
+  private readonly logger = new Logger(WorkspacesService.name);
+
   constructor(
     @InjectRepository(Workspace)
     private readonly workspaceRepository: Repository<Workspace>,
@@ -29,6 +33,7 @@ export class WorkspacesService extends BaseService<Workspace> {
     @InjectRepository(WorkspaceRole)
     private readonly roleRepository: Repository<WorkspaceRole>,
     private readonly dataSource: DataSource,
+    private readonly workspaceEncryptionService: WorkspaceEncryptionService,
   ) {
     super();
   }
@@ -82,6 +87,19 @@ export class WorkspacesService extends BaseService<Workspace> {
       await queryRunner.manager.save(ownerMember);
 
       await queryRunner.commitTransaction();
+
+      // 4. Tạo DEK cho workspace (sau commit; nếu VAULT_TOKEN không có thì bỏ qua)
+      try {
+        await this.workspaceEncryptionService.createDekForWorkspace(
+          savedWorkspace.id,
+        );
+      } catch (dekErr) {
+        // Workspace đã tạo; log lỗi DEK, không fail request. Seed có thể bù sau.
+        this.logger.warn(
+          `Failed to create DEK for workspace ${savedWorkspace.id}: ${dekErr}`,
+        );
+      }
+
       return savedWorkspace;
     } catch (err) {
       await queryRunner.rollbackTransaction();

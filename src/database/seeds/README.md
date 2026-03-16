@@ -102,6 +102,23 @@ if (existingRoles === 0) {
 }
 ```
 
+### Workspace Encryption Keys (Vault Transit)
+
+Seed `workspace-encryption-keys.seed.ts` dùng Envelope Encryption:
+
+- **KEK** (Key Encryption Key): tạo trong Vault Transit, tên mặc định `content-kek`.
+- **DEK** (Data Encryption Key): mỗi workspace một DEK; Vault generate datakey (plaintext + ciphertext), seed chỉ lưu **ciphertext** vào bảng `workspace_encryption_keys`.
+
+**Yêu cầu:**
+
+1. Vault chạy, bật Transit: `vault secrets enable transit`
+2. Biến môi trường (nếu không set thì seed bỏ qua bước này):
+   - `VAULT_ADDR`: mặc định `http://127.0.0.1:8200`
+   - `VAULT_TOKEN`: token có quyền `transit/keys/*` và `transit/datakey/plaintext/*`
+   - `VAULT_TRANSIT_KEK_NAME`: tên key trong Transit (mặc định `content-kek`)
+
+**Idempotent:** Workspace đã có bản ghi trong `workspace_encryption_keys` sẽ bị bỏ qua.
+
 ### Database Connection
 
 Seeds sử dụng cấu hình từ `.env`:
@@ -112,6 +129,11 @@ DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
 DB_NAME=chatbot
+
+# Tùy chọn - cho seed encryption keys (Vault)
+VAULT_ADDR=http://127.0.0.1:8200
+VAULT_TOKEN=your-token
+VAULT_TRANSIT_KEK_NAME=content-kek
 ```
 
 ### Synchronize

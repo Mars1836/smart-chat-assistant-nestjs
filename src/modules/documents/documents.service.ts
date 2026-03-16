@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,10 +12,11 @@ import { CreateDocumentDto, UpdateDocumentDto } from './dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
-import * as fs from 'fs';
 import * as path from 'path';
+import { DocumentStorageService } from '../../common/storage';
 import { RagService } from '../rag/rag.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { WorkspaceEncryptionService } from '../workspaces/workspace-encryption.service';
 
 @Injectable()
 export class DocumentsService extends BaseService<Document> {
@@ -30,6 +30,8 @@ export class DocumentsService extends BaseService<Document> {
     private readonly ragService: RagService,
     private readonly knowledgeService: KnowledgeService,
     private readonly jwtService: JwtService,
+    private readonly workspaceEncryptionService: WorkspaceEncryptionService,
+    private readonly documentStorageService: DocumentStorageService,
   ) {
     super();
   }
@@ -65,24 +67,30 @@ export class DocumentsService extends BaseService<Document> {
 
     // Permission check handled by PermissionsGuard
 
-    // Create uploads directory if not exists
-    const uploadsDir = path.join(
-      process.cwd(),
-      'uploads',
-      'documents',
-      workspaceId,
-    );
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
     // Create unique filename
     const ext = path.extname(file.originalname);
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-    const filePath = path.join(uploadsDir, uniqueName);
 
-    // Save file to disk
-    fs.writeFileSync(filePath, file.buffer);
+    // Mã hóa nội dung nếu workspace có DEK (bỏ qua nếu Vault/DEK lỗi)
+    let contentToWrite: Buffer = file.buffer;
+    try {
+      const encrypted = await this.workspaceEncryptionService.encryptContent(
+        workspaceId,
+        file.buffer,
+      );
+      if (encrypted) {
+        contentToWrite = encrypted;
+      }
+    } catch {
+      // Vault/DEK lỗi: upload plaintext, không fail
+    }
+
+    const fileRef = await this.documentStorageService.uploadDocument(
+      workspaceId,
+      uniqueName,
+      contentToWrite,
+      file.mimetype,
+    );
 
     // Determine file type
     const fileType = createDto.type || ext.replace('.', '').toLowerCase();
@@ -93,7 +101,7 @@ export class DocumentsService extends BaseService<Document> {
       knowledge_id: createDto.knowledge_id,
       user_id: userId,
       file_name: createDto.file_name || file.originalname,
-      file_url: `/uploads/documents/${workspaceId}/${uniqueName}`,
+      file_url: fileRef,
       type: fileType,
       size: file.size,
       status: 'pending',
@@ -107,7 +115,6 @@ export class DocumentsService extends BaseService<Document> {
     // Trigger RAG Indexing (Async)
     await this.ragService.indexDocument(
       savedDoc.id,
-      `/uploads/documents/${workspaceId}/${uniqueName}`,
       fileType,
       userId,
     );
@@ -201,11 +208,7 @@ export class DocumentsService extends BaseService<Document> {
 
     // Permission check handled by PermissionsGuard
 
-    // Delete file from disk
-    const filePath = path.join(process.cwd(), document.file_url);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    await this.documentStorageService.deleteDocument(document.file_url);
 
     // Delete vectors from PostgreSQL and Qdrant
     await this.ragService.deleteDocumentVectors(documentId);
@@ -269,18 +272,14 @@ export class DocumentsService extends BaseService<Document> {
   }
 
   /**
-   * Get physical file path for document
+   * Get physical file path for document (dùng khi file không mã hóa)
    */
   async getFilePath(
-    workspaceId: string, 
-    documentId: string, 
-    userId: string
+    workspaceId: string,
+    documentId: string,
+    userId: string,
   ): Promise<{ path: string; mimetype: string; filename: string }> {
-     // We define a simpler findOne without permission check if we want to skip overhead, 
-     // but here we reuse findOne to ensure basic access rights first (though the token proves it).
-     // Ideally, validating the token is enough, but checking DB ensures file still exists.
-     
-     const document = await this.documentRepo.findOne({
+    const document = await this.documentRepo.findOne({
       where: { id: documentId, workspace_id: workspaceId },
     });
 
@@ -288,23 +287,74 @@ export class DocumentsService extends BaseService<Document> {
       throw new NotFoundException('Document not found');
     }
 
-    // Return absolute path
-    // Note: document.file_url stored as relative: /uploads/documents/...
-    // We need to convert to absolute system path
-    const relativePath = document.file_url.startsWith('/') 
-      ? document.file_url.substring(1) 
-      : document.file_url;
-      
-    const absolutePath = path.join(process.cwd(), relativePath);
-
-    if (!fs.existsSync(absolutePath)) {
-      throw new NotFoundException('File not found on server');
+    const absolutePath = this.documentStorageService.getLocalFilePath(
+      document.file_url,
+    );
+    if (!absolutePath) {
+      throw new NotFoundException(
+        'Physical path is not available when document storage is cloud-based',
+      );
     }
 
     return {
       path: absolutePath,
       mimetype: this.getMimeType(document.type),
-      filename: document.file_name
+      filename: document.file_name,
+    };
+  }
+
+  /**
+   * Lấy nội dung file (đã giải mã nếu cần) để phục vụ view/download.
+   */
+  async getFileContent(
+    workspaceId: string,
+    documentId: string,
+    userId: string,
+  ): Promise<{ buffer: Buffer; mimetype: string; filename: string }> {
+    const document = await this.documentRepo.findOne({
+      where: { id: documentId, workspace_id: workspaceId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await this.documentStorageService.readDocument(document.file_url);
+    } catch {
+      throw new NotFoundException('File not found on server');
+    }
+
+    // Giải mã nếu file đã mã hóa (ENC1); bỏ qua nếu chưa mã hóa
+    if (this.workspaceEncryptionService.isEncrypted(buffer)) {
+      try {
+        const decrypted = await this.workspaceEncryptionService.decryptContent(
+          workspaceId,
+          buffer,
+        );
+        if (decrypted) {
+          buffer = Buffer.from(decrypted);
+        }
+        // decrypt null = DEK/Vault lỗi → không thể trả nội dung
+        else {
+          throw new NotFoundException(
+            'File is encrypted but decryption failed (Vault/DEK unavailable)',
+          );
+        }
+      } catch (e) {
+        if (e instanceof NotFoundException) throw e;
+        throw new NotFoundException(
+          'File is encrypted but decryption failed: ' +
+            (e instanceof Error ? e.message : String(e)),
+        );
+      }
+    }
+
+    return {
+      buffer,
+      mimetype: this.getMimeType(document.type),
+      filename: document.file_name,
     };
   }
 

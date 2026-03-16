@@ -8,8 +8,8 @@ import { DocumentParsingService } from '../services/document-parsing.service';
 import { VectorStoreService } from '../services/vector-store.service';
 import { RagEventsService } from '../services/rag-events.service';
 import { GeminiProvider } from '../../../common/providers/gemini.provider';
-import * as path from 'path';
-import * as fs from 'fs';
+import { DocumentStorageService } from '../../../common/storage';
+import { WorkspaceEncryptionService } from '../../workspaces/workspace-encryption.service';
 
 @Processor('document-queue')
 export class DocumentProcessingProcessor extends WorkerHost {
@@ -22,15 +22,14 @@ export class DocumentProcessingProcessor extends WorkerHost {
     private readonly vectorStoreService: VectorStoreService,
     private readonly aiStudio: GeminiProvider,
     private readonly eventsService: RagEventsService,
+    private readonly workspaceEncryptionService: WorkspaceEncryptionService,
+    private readonly documentStorageService: DocumentStorageService,
   ) {
     super();
   }
 
-  async process(job: Job<{ documentId: string; filePath: string; mimetype: string }>): Promise<any> {
-    const { documentId, filePath, mimetype } = job.data;
-    // Remove leading slash to ensure proper relative path resolution on Windows
-    const normalizedPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
-    const absolutePath = path.resolve(process.cwd(), normalizedPath);
+  async process(job: Job<{ documentId: string; mimetype: string }>): Promise<any> {
+    const { documentId, mimetype } = job.data;
 
     this.logger.log(`Start processing document ${documentId}`);
     
@@ -38,8 +37,43 @@ export class DocumentProcessingProcessor extends WorkerHost {
       // 1. Start
       await this.updateProgress(documentId, 10, 'Đang đọc thẻ...');
       
-      // 2. Extract
-      const text = await this.parsingService.extractText(absolutePath, mimetype);
+      // 2. Extract (giải mã nếu file đã mã hóa; bỏ qua nếu chưa mã hóa)
+      const document = await this.documentRepo.findOne({
+        where: { id: documentId },
+      });
+      if (!document) {
+        throw new Error('Document not found');
+      }
+      let fileBuffer = await this.documentStorageService.readDocument(
+        document.file_url,
+      );
+      if (this.workspaceEncryptionService.isEncrypted(fileBuffer)) {
+        if (document.workspace_id) {
+          try {
+            const decrypted =
+              await this.workspaceEncryptionService.decryptContent(
+                document.workspace_id,
+                fileBuffer,
+              );
+            if (decrypted) {
+              fileBuffer = Buffer.from(decrypted);
+            } else {
+              throw new Error('Decryption returned null (DEK/Vault unavailable)');
+            }
+          } catch (e) {
+            throw new Error(
+              `File is encrypted but decryption failed: ${e instanceof Error ? e.message : e}`,
+            );
+          }
+        } else {
+          throw new Error('Encrypted file but document has no workspace_id');
+        }
+      }
+      const text = await this.parsingService.extractTextFromBuffer(
+        fileBuffer,
+        mimetype,
+        document.file_url,
+      );
       await this.updateProgress(documentId, 30, 'Đang chia nhỏ văn bản...');
 
       // 3. Chunk (CSV: mỗi dòng context = 1 chunk; các loại khác: chunk theo đoạn / heading)
@@ -55,10 +89,6 @@ export class DocumentProcessingProcessor extends WorkerHost {
           mimeType: mimetype,
         });
       }
-      // Lấy meta document để thêm file_name vào chunk khi index
-      const document = await this.documentRepo.findOne({
-        where: { id: documentId },
-      });
 
       await this.documentRepo.update(documentId, { chunk_count: chunks.length });
       await this.updateProgress(documentId, 40, `Đã chia thành ${chunks.length} đoạn. Đang tạo vector...`);
@@ -67,20 +97,41 @@ export class DocumentProcessingProcessor extends WorkerHost {
       // Delete old vectors if any
       await this.vectorStoreService.deleteByDocumentId(documentId);
 
+      const workspaceId = document.workspace_id;
+
       for (let i = 0; i < chunks.length; i++) {
         const rawChunk = chunks[i];
 
         // Thêm metadata (file_name) vào nội dung chunk để LLM hiểu nguồn context
-        const prefix = document?.file_name
+        const prefix = document.file_name
           ? `[Source: ${document.file_name}]\n\n`
           : '';
         const chunk = `${prefix}${rawChunk}`;
-        
+
+        // Mã hóa content trước khi lưu Qdrant (bỏ qua nếu không có DEK)
+        let contentToStore = chunk;
+        if (workspaceId) {
+          try {
+            const encrypted =
+              await this.workspaceEncryptionService.encryptString(
+                workspaceId,
+                chunk,
+              );
+            if (encrypted) contentToStore = encrypted;
+          } catch {
+            // Vault/DEK lỗi: lưu plaintext
+          }
+        }
+
         // Rate limit mitigation: sleep slightly? Gemini is fast but generous rate limits.
-        // Parallelize? Be careful with API limits. Sequential is safer for now.
         const embedding = await this.aiStudio.generateEmbedding(chunk);
-        
-        await this.vectorStoreService.saveVector(documentId, chunk, embedding, { chunk_index: i });
+
+        await this.vectorStoreService.saveVector(
+          documentId,
+          contentToStore,
+          embedding,
+          { chunk_index: i },
+        );
 
         const progress = 40 + Math.floor(((i + 1) / chunks.length) * 50); // 40 -> 90
         await this.updateProgress(documentId, progress, `Đang xử lý vector ${i + 1}/${chunks.length}...`);

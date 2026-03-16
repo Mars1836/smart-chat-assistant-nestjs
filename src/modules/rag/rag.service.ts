@@ -19,10 +19,9 @@ export class RagService {
   /**
    * Add document to indexing queue
    */
-  async indexDocument(documentId: string, filePath: string, mimetype: string, userId: string) {
+  async indexDocument(documentId: string, mimetype: string, userId: string) {
     await this.documentQueue.add('process-document', {
       documentId,
-      filePath,
       mimetype,
       userId,
     });

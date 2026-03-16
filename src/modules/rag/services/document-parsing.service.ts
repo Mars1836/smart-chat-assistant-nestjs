@@ -113,12 +113,23 @@ export class DocumentParsingService {
    * Extract text from file based on mimetype
    */
   async extractText(filePath: string, mimetype: string): Promise<string> {
+    const buffer = fs.readFileSync(filePath);
+    return this.extractTextFromBuffer(buffer, mimetype, filePath);
+  }
+
+  /**
+   * Extract text from buffer (dùng khi đã đọc/giải mã file)
+   */
+  async extractTextFromBuffer(
+    buffer: Buffer,
+    mimetype: string,
+    sourceLabel = 'buffer',
+  ): Promise<string> {
     try {
-      const buffer = fs.readFileSync(filePath);
       const normalizedMime = this.normalizeMimeType(mimetype);
 
       this.logger.log(
-        `Extracting text from ${filePath} (type: ${mimetype} → ${normalizedMime})`,
+        `Extracting text from ${sourceLabel} (type: ${mimetype} → ${normalizedMime})`,
       );
 
       // PDF
@@ -154,13 +165,13 @@ export class DocumentParsingService {
 
       // Images - Use Gemini Vision for OCR/description
       if (this.isImage(normalizedMime)) {
-        this.logger.log(`Processing image with Gemini Vision: ${filePath}`);
+        this.logger.log(`Processing image with Gemini Vision: ${sourceLabel}`);
         return await this.aiStudioService.describeImage(buffer, normalizedMime);
       }
 
       throw new Error(`Unsupported file type: ${mimetype}`);
     } catch (error) {
-      this.logger.error(`Error extracting text from ${filePath}`, error);
+      this.logger.error(`Error extracting text from ${sourceLabel}`, error);
       throw error;
     }
   }

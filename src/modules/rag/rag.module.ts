@@ -10,11 +10,13 @@ import { DocumentProcessingProcessor } from './processors/document-processing.pr
 import { Document } from '../documents/entities/document.entity';
 import { RagService } from './rag.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([DocumentVector, Document]),
+    WorkspacesModule,
     BullModule.registerQueue({
       name: 'document-queue',
     }),

@@ -34,6 +34,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { WidgetModule } from './modules/widget/widget.module';
+import { StorageModule } from './common/storage';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { WidgetModule } from './modules/widget/widget.module';
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    StorageModule,
     // RBAC Modules
     SystemRolesModule,
     WorkspaceRolesModule,

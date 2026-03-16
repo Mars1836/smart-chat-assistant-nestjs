@@ -42,8 +42,12 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
 import type { Response } from 'express';
-import { StreamableFile, UnauthorizedException, Res, BadRequestException } from '@nestjs/common';
-import * as fs from 'fs';
+import {
+  StreamableFile,
+  UnauthorizedException,
+  Res,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 @ApiTags('documents')
@@ -142,7 +146,7 @@ export class DocumentsController {
             workspace_id: 'workspace-uuid-here',
             user_id: 'user-uuid-here',
             file_name: 'tai-lieu.pdf',
-            file_url: '/uploads/documents/workspace-id/abc123.pdf',
+            file_url: 'gs://my-chatbot-bucket/documents/workspace-id/abc123.pdf',
             type: 'pdf',
             size: 1024000,
             uploaded_at: '2024-01-01T00:00:00.000Z',
@@ -201,20 +205,19 @@ export class DocumentsController {
 
       const { documentId, sub: userId } = payload;
 
-      const { path: filePath, mimetype, filename } = await this.documentsService.getFilePath(
-        workspaceId,
-        documentId,
-        userId
-      );
-
-      const fileStream = fs.createReadStream(filePath);
+      const { buffer, mimetype, filename } =
+        await this.documentsService.getFileContent(
+          workspaceId,
+          documentId,
+          userId,
+        );
 
       res.set({
         'Content-Type': mimetype,
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
 
-      return new StreamableFile(fileStream);
+      return new StreamableFile(buffer, { type: mimetype });
 
     } catch (e) {
       if (e instanceof UnauthorizedException || e.name === 'JsonWebTokenError') {
