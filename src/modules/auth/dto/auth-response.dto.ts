@@ -9,11 +9,13 @@ export class AuthResponseDto {
   accessToken: string;
 
   @ApiProperty({
-    description: 'JWT refresh token (expires in 7 days)',
+    description:
+      'JWT refresh token (mobile only). Omitted for web when refresh is set as HttpOnly cookie.',
     example:
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE1MTYyMzkwMjJ9...',
+    required: false,
   })
-  refreshToken: string;
+  refreshToken?: string;
 
   @ApiProperty({
     description: 'User id (để FE lưu và chuyển trang theo system_role)',
@@ -48,6 +50,13 @@ export class RefreshResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   accessToken: string;
+
+  @ApiProperty({
+    description:
+      'New refresh token after rotation (mobile only). Web receives rotated refresh via Set-Cookie.',
+    required: false,
+  })
+  refreshToken?: string;
 }
 
 export class ProfileResponseDto {

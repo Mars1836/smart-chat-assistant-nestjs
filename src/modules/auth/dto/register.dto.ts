@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsString,
   MinLength,
@@ -63,4 +64,15 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   avatar_url?: string;
+
+  @ApiProperty({
+    description:
+      'Client kind: web or mobile. Prefer header X-Client-Type.',
+    enum: ['web', 'mobile'],
+    required: false,
+    default: 'web',
+  })
+  @IsOptional()
+  @IsIn(['web', 'mobile'])
+  client_type?: 'web' | 'mobile';
 }

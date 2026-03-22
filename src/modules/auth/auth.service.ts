@@ -11,12 +11,12 @@ import * as bcrypt from 'bcrypt';
 import {
   LoginDto,
   RegisterDto,
-  RefreshDto,
   AuthResponseDto,
   RefreshResponseDto,
   ProfileResponseDto,
   ChangePasswordDto,
 } from './dto';
+import type { AuthClientType } from './auth-client-type';
 import { User } from '../users/entities/user.entity';
 import { SystemRole } from '../system-roles/entities/system-role.entity';
 
@@ -31,8 +31,52 @@ export class AuthService {
     private readonly systemRoleRepository: Repository<SystemRole>,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    // Check if user already exists
+  private signTokens(userId: string, email: string): {
+    accessToken: string;
+    refreshToken: string;
+  } {
+    const accessToken = this.jwtService.sign({
+      sub: userId,
+      email,
+    });
+    const refreshToken = this.jwtService.sign(
+      { sub: userId, email, type: 'refresh' },
+      {
+        expiresIn:
+          this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN') ??
+          '7d',
+      } as any,
+    );
+    return { accessToken, refreshToken };
+  }
+
+  private toAuthResponse(
+    userWithRole: {
+      id: string;
+      name: string;
+      email: string;
+      systemRole?: { name: string } | null;
+    },
+    tokens: { accessToken: string; refreshToken: string },
+    clientType: AuthClientType,
+  ): AuthResponseDto {
+    const base: AuthResponseDto = {
+      accessToken: tokens.accessToken,
+      id: userWithRole.id,
+      name: userWithRole.name,
+      email: userWithRole.email,
+      system_role: userWithRole.systemRole?.name ?? null,
+    };
+    if (clientType === 'mobile') {
+      base.refreshToken = tokens.refreshToken;
+    }
+    return base;
+  }
+
+  async register(
+    registerDto: RegisterDto,
+    clientType: AuthClientType,
+  ): Promise<{ auth: AuthResponseDto; refreshToken: string }> {
     const existingUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
     });
@@ -41,7 +85,6 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    // Hash password
     const saltRounds =
       this.configService.get<number>('BCRYPT_SALT_ROUNDS') ?? 10;
     const hashedPassword = await bcrypt.hash(registerDto.password, saltRounds);
@@ -58,7 +101,6 @@ export class AuthService {
       );
     }
 
-    // Create new user
     const user = this.userRepository.create({
       name: registerDto.name,
       email: registerDto.email,
@@ -70,39 +112,23 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
-    // Load với systemRole để trả system_role trong response
     const userWithRole = await this.userRepository.findOne({
       where: { id: savedUser.id, is_deleted: false },
       relations: ['systemRole'],
       select: ['id', 'name', 'email'],
     });
 
-    const accessToken = this.jwtService.sign({
-      sub: savedUser.id,
-      email: savedUser.email,
-    });
-    const refreshToken = this.jwtService.sign(
-      { sub: savedUser.id, type: 'refresh' },
-      {
-        expiresIn:
-          this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN') ??
-          '7d',
-      } as any,
-    );
-
+    const tokens = this.signTokens(savedUser.id, savedUser.email);
     return {
-      accessToken,
-      refreshToken,
-      id: userWithRole!.id,
-      name: userWithRole!.name,
-      email: userWithRole!.email,
-      system_role: userWithRole!.systemRole?.name ?? null,
+      auth: this.toAuthResponse(userWithRole!, tokens, clientType),
+      refreshToken: tokens.refreshToken,
     };
   }
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    // Find user by email
-    // Find user by email
+  async login(
+    loginDto: LoginDto,
+    clientType: AuthClientType,
+  ): Promise<{ auth: AuthResponseDto; refreshToken: string }> {
     const user = await this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.password')
@@ -114,7 +140,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
       user.password,
@@ -124,57 +149,65 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Load user với systemRole để trả system_role trong response (FE chuyển trang theo role)
     const userWithRole = await this.userRepository.findOne({
       where: { id: user.id, is_deleted: false },
       relations: ['systemRole'],
       select: ['id', 'name', 'email'],
     });
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-    });
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id, type: 'refresh' },
-      {
-        expiresIn:
-          this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES_IN') ??
-          '7d',
-      } as any,
-    );
-
+    const tokens = this.signTokens(user.id, user.email);
     return {
-      accessToken,
-      refreshToken,
-      id: userWithRole!.id,
-      name: userWithRole!.name,
-      email: userWithRole!.email,
-      system_role: userWithRole!.systemRole?.name ?? null,
+      auth: this.toAuthResponse(userWithRole!, tokens, clientType),
+      refreshToken: tokens.refreshToken,
     };
   }
 
-  refresh(refreshDto: RefreshDto): RefreshResponseDto {
-    // TODO: Verify refresh token and validate it hasn't been revoked
+  /**
+   * Rotates refresh token (new access + new refresh). Caller sets cookie for web.
+   */
+  async refresh(refreshToken: string): Promise<RefreshResponseDto> {
+    let payload: { sub: string; email: string; type?: string };
     try {
-      const payload = this.jwtService.verify<{
+      payload = this.jwtService.verify<{
         sub: string;
         email: string;
-      }>(refreshDto.refreshToken);
-      const accessToken = this.jwtService.sign({
-        sub: payload.sub,
-        email: payload.email,
-      });
-      return { accessToken };
+        type?: string;
+      }>(refreshToken);
     } catch {
-      throw new Error('Invalid refresh token');
+      throw new UnauthorizedException('Invalid refresh token');
     }
+
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub, is_deleted: false },
+      select: ['id', 'email'],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const tokens = this.signTokens(user.id, user.email);
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   async profile(userId: string): Promise<ProfileResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id: userId, is_deleted: false },
-      select: ['id', 'name', 'email', 'avatar_url', 'language', 'system_role_id'],
+      select: [
+        'id',
+        'name',
+        'email',
+        'avatar_url',
+        'language',
+        'system_role_id',
+      ],
       relations: ['systemRole'],
     });
 
@@ -194,7 +227,6 @@ export class AuthService {
     email: string,
     newPassword: string,
   ): Promise<void> {
-    // Find user by email
     const user = await this.userRepository.findOne({
       where: { email, is_deleted: false },
     });
@@ -203,12 +235,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // Hash new password
     const saltRounds =
       this.configService.get<number>('BCRYPT_SALT_ROUNDS') ?? 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update password
     user.password = hashedPassword;
     await this.userRepository.save(user);
   }

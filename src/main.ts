@@ -11,14 +11,21 @@ import { RequestContextInterceptor } from './common/interceptors/request-context
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { swaggerConfig, swaggerOptions } from './swagger';
 import * as path from 'path';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  app.use(cookieParser());
 
-  // Enable CORS for all domains
+  const corsOriginsEnv = process.env.CORS_ORIGIN?.trim();
+  const corsOrigin =
+    corsOriginsEnv && corsOriginsEnv.length > 0
+      ? corsOriginsEnv.split(',').map((o) => o.trim())
+      : true;
+
   app.enableCors({
-    origin: true, // Allow all origins
+    origin: corsOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: '*',
