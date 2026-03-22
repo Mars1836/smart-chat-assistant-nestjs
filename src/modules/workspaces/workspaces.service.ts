@@ -18,6 +18,7 @@ import { BaseService } from '../../common/services/base.service';
 import { WORKSPACE_ROLES } from '../../common/constants/permissions.constant';
 import { WorkspaceStatsSummaryDto } from './dto';
 import { WorkspaceEncryptionService } from './workspace-encryption.service';
+import { DEFAULT_CONVERSATION_STARTERS } from '../chatbots/entities/chatbot.entity';
 
 @Injectable()
 export class WorkspacesService extends BaseService<Workspace> {
@@ -66,6 +67,7 @@ export class WorkspacesService extends BaseService<Workspace> {
         greeting_message: `Xin chào! Tôi là chatbot của ${savedWorkspace.name}. Tôi có thể giúp gì cho bạn?`,
         fallback_message:
           'Xin lỗi, tôi chưa hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn được không?',
+        conversation_starters: DEFAULT_CONVERSATION_STARTERS,
       });
       await queryRunner.manager.save(chatbot);
 
@@ -290,3 +292,5 @@ export class WorkspacesService extends BaseService<Workspace> {
     };
   }
 }
+
+

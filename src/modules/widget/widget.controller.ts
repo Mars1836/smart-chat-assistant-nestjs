@@ -1,9 +1,25 @@
-import { Body, Controller, Post, Req, Res, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  Res,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiParam,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { WidgetService } from './widget.service';
 import { WidgetChatDto, WidgetChatResponseDto } from './dto/widget-chat.dto';
 import { WidgetSecurityService } from './widget-security.service';
+import { WidgetPublicConfigDto } from './dto/widget-public-config.dto';
 
 @ApiTags('widget')
 @Controller('public/widget')
@@ -12,6 +28,43 @@ export class WidgetController {
     private readonly widgetService: WidgetService,
     private readonly widgetSecurityService: WidgetSecurityService,
   ) {}
+
+  @Get('config/:chatbotId')
+  @ApiOperation({
+    summary: 'Lay public config cho widget',
+    description:
+      'Tra ve cau hinh an toan cho FE widget, bao gom UI, greeting message va conversation starters. Endpoint nay ap dung whitelist/API key giong widget chat, nhung khong tieu ton rate limit chat.',
+  })
+  @ApiHeader({
+    name: 'X-Widget-Key',
+    required: false,
+    description:
+      'API key cong khai cua widget. Bat buoc neu chatbot co cau hinh public_api_key.',
+  })
+  @ApiParam({
+    name: 'chatbotId',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Public widget config',
+    type: WidgetPublicConfigDto,
+  })
+  async getConfig(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('chatbotId') chatbotId: string,
+  ): Promise<void> {
+    const { chatbot, widgetConfig } =
+      await this.widgetSecurityService.validateAccessAndGetChatbot(
+        req,
+        chatbotId,
+      );
+
+    res.status(HttpStatus.OK).json(
+      this.widgetService.getPublicConfig(chatbot, widgetConfig),
+    );
+  }
 
   @Post('chat')
   @ApiOperation({

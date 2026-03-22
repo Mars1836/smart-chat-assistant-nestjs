@@ -9,7 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Chatbot } from './entities/chatbot.entity';
+import {
+  Chatbot,
+  DEFAULT_CONVERSATION_STARTERS,
+} from './entities/chatbot.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
 import { Message } from '../messages/entities/message.entity';
@@ -87,6 +90,10 @@ export class ChatbotsService extends BaseService<Chatbot> {
         createDto.greeting_message ?? 'Xin chào! Tôi có thể giúp gì cho bạn?',
       fallback_message:
         createDto.fallback_message ?? 'Xin lỗi, tôi chưa hiểu câu hỏi của bạn.',
+      conversation_starters:
+        createDto.conversation_starters?.length
+          ? createDto.conversation_starters
+          : DEFAULT_CONVERSATION_STARTERS,
       confidence_threshold: createDto.confidence_threshold ?? 0.7,
       max_context_turns: createDto.max_context_turns ?? 5,
       enable_learning: createDto.enable_learning ?? true,
@@ -152,6 +159,12 @@ export class ChatbotsService extends BaseService<Chatbot> {
     const chatbot = await this.findOne(workspaceId, chatbotId);
 
     Object.assign(chatbot, updateDto);
+    if (
+      updateDto.conversation_starters !== undefined &&
+      !updateDto.conversation_starters.length
+    ) {
+      chatbot.conversation_starters = [];
+    }
     return await this.chatbotRepo.save(chatbot);
   }
 
@@ -488,3 +501,5 @@ export class ChatbotsService extends BaseService<Chatbot> {
     );
   }
 }
+
+

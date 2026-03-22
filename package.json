@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "tsx src/database/seeds/seed.ts",
-    "migrate:documents:gcs": "tsx scripts/migrate-documents-to-gcs.ts"
+    "migrate:documents:gcs": "tsx scripts/migrate-documents-to-gcs.ts",
+    "backup:postgres": "tsx scripts/backup-postgres.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

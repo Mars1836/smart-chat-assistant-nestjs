@@ -3,6 +3,26 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 import { ChatbotTool } from '../../tools/entities/chatbot-tool.entity';
 
+export type ConversationStarter = {
+  label: string;
+  message: string;
+};
+
+export const DEFAULT_CONVERSATION_STARTERS: ConversationStarter[] = [
+  {
+    label: 'Giới thiệu',
+    message: 'Hãy giới thiệu ngắn gọn bạn có thể hỗ trợ những gì.',
+  },
+  {
+    label: 'Sản phẩm',
+    message: 'Cho tôi biết các sản phẩm hoặc dịch vụ nổi bật hiện có.',
+  },
+  {
+    label: 'Liên hệ',
+    message: 'Cho tôi thông tin liên hệ hoặc cách để được hỗ trợ thêm.',
+  },
+];
+
 @Entity({ name: 'chatbots' })
 export class Chatbot extends BaseEntity {
   @Column({ type: 'uuid' })
@@ -25,6 +45,9 @@ export class Chatbot extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   fallback_message: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  conversation_starters: ConversationStarter[] | null;
 
   @Column({ type: 'float', default: 0.7 })
   confidence_threshold: number;

@@ -59,6 +59,37 @@ export class WidgetSecurityService {
     return { chatbot, widgetConfig, rateLimited: !rateOk };
   }
 
+  async validateAccessAndGetChatbot(
+    req: Request,
+    chatbotId: string,
+  ): Promise<{
+    chatbot: Chatbot;
+    widgetConfig: ChatbotWidgetConfig;
+  }> {
+    const chatbot = await this.chatbotRepo.findOne({
+      where: { id: chatbotId },
+    });
+
+    if (!chatbot || !chatbot.enabled) {
+      throw new ForbiddenException('Chatbot not found or disabled');
+    }
+
+    const rawConfig = (chatbot.widget_config ?? {}) as Partial<ChatbotWidgetConfig>;
+    const widgetConfig: ChatbotWidgetConfig = {
+      ui: rawConfig.ui ?? null,
+      security: this.normalizeSecurityConfig(rawConfig.security),
+    };
+
+    const { origin, originHostname } = this.extractOrigin(req);
+    const ip = this.extractIp(req);
+    const apiKey = this.extractApiKey(req);
+
+    this.checkWhitelist(widgetConfig.security, origin, originHostname, ip);
+    this.checkApiKey(widgetConfig.security, apiKey);
+
+    return { chatbot, widgetConfig };
+  }
+
   private normalizeSecurityConfig(
     security?: Partial<ChatbotWidgetSecurityConfig> | null,
   ): ChatbotWidgetSecurityConfig {
@@ -242,4 +273,3 @@ export class WidgetSecurityService {
     return ctx.ip ?? 'unknown-ip';
   }
 }
-

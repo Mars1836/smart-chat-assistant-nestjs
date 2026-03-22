@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsArray,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,7 +10,28 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+export class ConversationStarterDto {
+  @ApiProperty({
+    description: 'Nhãn ngắn hiển thị trên nút gợi ý',
+    example: 'Giới thiệu',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  label: string;
+
+  @ApiProperty({
+    description: 'Nội dung sẽ được gửi khi người dùng click starter',
+    example: 'Hãy giới thiệu ngắn gọn bạn có thể hỗ trợ những gì.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  message: string;
+}
 
 export class CreateChatbotDto {
   @ApiProperty({
@@ -52,6 +75,27 @@ export class CreateChatbotDto {
   @IsString()
   @IsOptional()
   fallback_message?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Danh sách gợi ý hội thoại đầu tiên để người dùng click khi bắt đầu conversation mới',
+    type: [ConversationStarterDto],
+    example: [
+      {
+        label: 'Giới thiệu',
+        message: 'Hãy giới thiệu ngắn gọn bạn có thể hỗ trợ những gì.',
+      },
+      {
+        label: 'Sản phẩm',
+        message: 'Cho tôi biết các sản phẩm hoặc dịch vụ nổi bật hiện có.',
+      },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConversationStarterDto)
+  conversation_starters?: ConversationStarterDto[];
 
   @ApiPropertyOptional({
     description: 'Ngưỡng confidence (0-1)',

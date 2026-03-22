@@ -7,6 +7,7 @@ import { Message } from '../messages/entities/message.entity';
 import { WidgetChatDto } from './dto/widget-chat.dto';
 import { WidgetChatOrchestratorService } from './widget-chat-orchestrator.service';
 import { v4 as uuidv4 } from 'uuid';
+import { WidgetPublicConfigDto } from './dto/widget-public-config.dto';
 
 @Injectable()
 export class WidgetService {
@@ -19,6 +20,19 @@ export class WidgetService {
     private readonly messageRepo: Repository<Message>,
     private readonly widgetChatOrchestrator: WidgetChatOrchestratorService,
   ) {}
+
+  getPublicConfig(
+    chatbot: Chatbot,
+    widgetConfig: { ui?: Record<string, any> | null },
+  ): WidgetPublicConfigDto {
+    return {
+      chatbot_id: chatbot.id,
+      name: chatbot.name,
+      greeting_message: chatbot.greeting_message,
+      ui: widgetConfig.ui ?? null,
+      conversation_starters: chatbot.conversation_starters ?? [],
+    };
+  }
 
   async chat(
     dto: WidgetChatDto,
