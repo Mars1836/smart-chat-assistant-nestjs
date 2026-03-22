@@ -1,0 +1,67 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Tool } from './entities/tool.entity';
+import { ToolAction } from './entities/tool-action.entity';
+import { ChatbotTool } from './entities/chatbot-tool.entity';
+import { ChatbotToolAction } from './entities/chatbot-tool-action.entity';
+import { WorkspaceTool } from './entities/workspace-tool.entity';
+import { UserToolCredential } from './entities/user-tool-credential.entity';
+import { ToolExecutionLog } from './entities/tool-execution-log.entity';
+import { Chatbot } from '../chatbots/entities/chatbot.entity';
+import { Workspace } from '../workspaces/entities/workspace.entity';
+import { ToolRegistryService } from './tool-registry.service';
+import { ToolExecutorService } from './tool-executor.service';
+import { ToolsService } from './tools.service';
+import { ToolsController } from './tools.controller';
+import { ChatbotToolsController } from './chatbot-tools.controller';
+import { WorkspaceToolsController } from './workspace-tools.controller';
+import { OAuthController } from './oauth.controller';
+import { WorkspaceToolsService } from './workspace-tools.service';
+import { OAuthService } from './oauth.service';
+import { RagModule } from '../rag/rag.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { AuthModule } from '../auth/auth.module';
+import { FileCleanupModule } from './file-cleanup/file-cleanup.module';
+import { GeminiProvider } from '../../common/providers/gemini.provider';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Tool,
+      ToolAction,
+      ChatbotTool,
+      ChatbotToolAction,
+      WorkspaceTool,
+      UserToolCredential,
+      ToolExecutionLog,
+      Chatbot,
+      Workspace,
+    ]),
+    RagModule, // Import to use RagService
+    KnowledgeModule, // Import to use KnowledgeService (chatbot-knowledge permissions)
+    AuthModule, // Import to provide JwtService & JwtAuthGuard in this module context
+    FileCleanupModule,
+  ],
+  controllers: [
+    ToolsController,
+    ChatbotToolsController,
+    WorkspaceToolsController,
+    OAuthController,
+  ],
+  providers: [
+    ToolRegistryService,
+    ToolExecutorService,
+    ToolsService,
+    WorkspaceToolsService,
+    OAuthService,
+    GeminiProvider, // For OCR (ocr_extract_text) and other vision-based tools
+  ],
+  exports: [
+    ToolRegistryService,
+    ToolExecutorService,
+    ToolsService,
+    WorkspaceToolsService,
+    OAuthService,
+  ],
+})
+export class ToolsModule {}

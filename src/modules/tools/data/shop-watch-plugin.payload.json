@@ -1,0 +1,181 @@
+{
+  "name": "shop_watch",
+  "display_name": "Shop đồng hồ Luxe Time",
+  "description": "Tra cứu sản phẩm đồng hồ: danh sách, sản phẩm nổi bật, chi tiết sản phẩm, sản phẩm tương tự và thương hiệu. Dùng khi khách hỏi về sản phẩm, gợi ý mua, so sánh.",
+  "category": "custom",
+  "is_enabled": true,
+  "executor_type": "generic_api",
+  "executor_config": {
+    "base_url": "http://localhost:5000"
+  },
+  "auth_config": { "type": "none" },
+  "actions": [
+    {
+      "name": "get_hot_products",
+      "display_name": "Lấy sản phẩm hot",
+      "description": "Lấy danh sách sản phẩm nổi bật, bán chạy của cửa hàng đồng hồ. Dùng khi khách yêu cầu gợi ý sản phẩm hot hoặc bán chạy.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "description": "Số lượng tối đa cần lấy (mặc định 6, tối đa 20)"
+          }
+        },
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/products/hot",
+        "params": {
+          "query": {
+            "limit": "{{limit}}"
+          }
+        }
+      },
+      "sort_order": 0,
+      "is_enabled": true,
+      "card_config": {
+        "enabled": true,
+        "field_mapping": { "title": "name", "url": "url", "imageUrl": "imageUrl", "description": "description" }
+      }
+    },
+    {
+      "name": "get_product_by_slug",
+      "display_name": "Chi tiết sản phẩm theo slug",
+      "description": "Lấy thông tin chi tiết một sản phẩm theo slug (định danh dạng chữ, ví dụ: omega-speedmaster-moonwatch). Dùng khi khách hỏi chi tiết một mẫu cụ thể.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Slug của sản phẩm (vd: omega-speedmaster-moonwatch, rolex-submariner-116610ln)"
+          }
+        },
+        "required": ["slug"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/products/{{slug}}",
+        "params": {}
+      },
+      "sort_order": 1,
+      "is_enabled": true
+    },
+    {
+      "name": "get_product_by_id",
+      "display_name": "Chi tiết sản phẩm theo ID",
+      "description": "Lấy thông tin chi tiết một sản phẩm theo id số (1, 2, 3...). Dùng khi đã có id từ danh sách trước đó.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "ID số của sản phẩm"
+          }
+        },
+        "required": ["id"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/products/by-id/{{id}}",
+        "params": {}
+      },
+      "sort_order": 2,
+      "is_enabled": true
+    },
+    {
+      "name": "get_similar_products",
+      "display_name": "Sản phẩm tương tự",
+      "description": "Lấy danh sách sản phẩm tương tự với một sản phẩm (cùng thương hiệu, cùng phân khúc). Dùng khi khách muốn xem thêm lựa chọn tương tự.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Slug của sản phẩm cần tìm tương tự (vd: omega-speedmaster-moonwatch)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Số lượng tối đa (mặc định 4)"
+          }
+        },
+        "required": ["slug"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/products/{{slug}}/similar",
+        "params": {
+          "query": {
+            "limit": "{{limit}}"
+          }
+        }
+      },
+      "sort_order": 3,
+      "is_enabled": true
+    },
+    {
+      "name": "list_products",
+      "display_name": "Danh sách sản phẩm (có lọc)",
+      "description": "Lấy danh sách sản phẩm với bộ lọc: thương hiệu, giới tính, khoảng giá, từ khóa tìm kiếm. Dùng khi khách muốn xem nhiều sản phẩm theo điều kiện.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "brand": {
+            "type": "string",
+            "description": "Lọc theo thương hiệu (vd: Omega, Rolex, Casio)"
+          },
+          "gender": {
+            "type": "string",
+            "description": "Lọc theo giới tính: nam hoặc nữ"
+          },
+          "search": {
+            "type": "string",
+            "description": "Từ khóa tìm trong tên, thương hiệu"
+          },
+          "minPrice": {
+            "type": "number",
+            "description": "Giá tối thiểu (VNĐ)"
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "Giá tối đa (VNĐ)"
+          }
+        },
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/products",
+        "params": {
+          "query": {
+            "brand": "{{brand}}",
+            "gender": "{{gender}}",
+            "search": "{{search}}",
+            "minPrice": "{{minPrice}}",
+            "maxPrice": "{{maxPrice}}"
+          }
+        }
+      },
+      "sort_order": 4,
+      "is_enabled": true
+    },
+    {
+      "name": "list_brands",
+      "display_name": "Danh sách thương hiệu",
+      "description": "Lấy danh sách tất cả thương hiệu đồng hồ có tại cửa hàng. Dùng khi khách hỏi có những hãng nào.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/api/brands",
+        "params": {}
+      },
+      "sort_order": 5,
+      "is_enabled": true
+    }
+  ]
+}
