@@ -5,24 +5,42 @@ import { parseExpiresToMs } from './auth-time.util';
 export const REFRESH_COOKIE_NAME = 'refreshToken';
 export const REFRESH_COOKIE_PATH = '/auth';
 
+/**
+ * Refresh cookie: FE và BE khác domain (cross-site) cần SameSite=None + Secure
+ * (trình duyệt mới gửi cookie kèp request cross-origin có credentials).
+ *
+ * Cấu hình: đặt REFRESH_COOKIE_CROSS_SITE=true hoặc REFRESH_COOKIE_SAMESITE=none
+ * (kèm HTTPS / REFRESH_COOKIE_SECURE=true nếu không phải production).
+ */
 function baseCookieOptions(configService: ConfigService): Pick<
   CookieOptions,
   'httpOnly' | 'secure' | 'sameSite' | 'path' | 'domain'
 > {
-  const secure =
+  const explicit = configService.get<string>('REFRESH_COOKIE_SAMESITE');
+  const crossSite =
+    configService.get<string>('REFRESH_COOKIE_CROSS_SITE') === 'true';
+
+  let sameSite: CookieOptions['sameSite'] = 'lax';
+  if (explicit === 'none' || explicit === 'lax' || explicit === 'strict') {
+    sameSite = explicit;
+  } else if (crossSite) {
+    // FE / BE khác site: bắt buộc None để trình duyệt gửi cookie (fetch credentials)
+    sameSite = 'none';
+  } else {
+    const treatAsProd =
+      configService.get<string>('NODE_ENV') === 'production' ||
+      configService.get<string>('REFRESH_COOKIE_SECURE') === 'true';
+    sameSite = treatAsProd ? 'none' : 'lax';
+  }
+
+  const secureBase =
     configService.get<string>('NODE_ENV') === 'production' ||
     configService.get<string>('REFRESH_COOKIE_SECURE') === 'true';
-  const sameSiteEnv = configService.get<string>('REFRESH_COOKIE_SAMESITE');
-  let sameSite: CookieOptions['sameSite'] = secure ? 'none' : 'lax';
-  if (
-    sameSiteEnv === 'none' ||
-    sameSiteEnv === 'lax' ||
-    sameSiteEnv === 'strict'
-  ) {
-    sameSite = sameSiteEnv;
-  }
+
+  // SameSite=None bắt buộc Secure (HTTPS); không thì trình duyệt bỏ qua cookie
+  const finalSecure = sameSite === 'none' ? true : secureBase;
+
   const domain = configService.get<string>('REFRESH_COOKIE_DOMAIN');
-  const finalSecure = sameSite === 'none' ? true : secure;
   return {
     httpOnly: true,
     secure: finalSecure,
