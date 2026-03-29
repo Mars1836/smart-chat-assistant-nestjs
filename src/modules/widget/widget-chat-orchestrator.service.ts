@@ -225,7 +225,6 @@ export class WidgetChatOrchestratorService {
     const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
       role: msg.role as any,
       content: msg.content || (msg as any).parts?.[0]?.text,
-      functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
       functionResponse:
         msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
           ? {
@@ -325,7 +324,6 @@ export class WidgetChatOrchestratorService {
     const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
       role: msg.role as any,
       content: msg.content || (msg as any).parts?.[0]?.text,
-      functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
       functionResponse:
         msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
           ? {

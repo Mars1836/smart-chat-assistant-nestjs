@@ -97,6 +97,11 @@ export class ChatbotsService extends BaseService<Chatbot> {
     });
   }
 
+  async listModelsNormalized(): Promise<string[]> {
+    const rows = await this.llmModelService.findAllForPricing();
+    return rows.map((row) => this.normalizeModelName(row.model));
+  }
+
   /**
    * Tạo chatbot mới cho workspace
    */
