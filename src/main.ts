@@ -28,8 +28,13 @@ async function bootstrap() {
     origin: corsOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    // Chromium preflight is strict: explicitly allow Content-Type (application/json)
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Type', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Client-Type',
+      'Accept',
+      'X-Widget-Key',
+    ],
   });
 
   // Enable validation globally

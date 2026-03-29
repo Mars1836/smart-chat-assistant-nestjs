@@ -11,6 +11,7 @@ import {
   maskApiKeyInConfigOverride,
   sanitizeToolAuthConfig,
 } from './utils/secret-mask.util';
+import { validateNoPrivateOutboundUrls } from './utils/tool-config-validation.util';
 
 export interface ToolWithMeta extends Tool {
   workspace_tool?: {
@@ -236,6 +237,12 @@ export class ToolsService {
   async create(dto: CreateToolDto): Promise<Tool> {
     const { actions, ...toolData } = dto;
 
+    await validateNoPrivateOutboundUrls(
+      dto.executor_config,
+      'Tool executor_config',
+    );
+    await validateNoPrivateOutboundUrls(dto.auth_config, 'Tool auth_config');
+
     // Create tool first
     const tool = this.toolRepo.create({
       ...toolData,
@@ -247,6 +254,10 @@ export class ToolsService {
     // Create actions if provided
     if (actions && actions.length > 0) {
       for (const actionDto of actions) {
+        await validateNoPrivateOutboundUrls(
+          actionDto.executor_config,
+          `Action executor_config (${actionDto.name})`,
+        );
         const action = this.toolActionRepo.create({
           tool_id: savedTool.id,
           name: actionDto.name,
@@ -270,6 +281,16 @@ export class ToolsService {
     const tool = await this.findOne(id);
     const { actions, ...toolData } = dto;
 
+    if (dto.executor_config !== undefined) {
+      await validateNoPrivateOutboundUrls(
+        dto.executor_config,
+        'Tool executor_config',
+      );
+    }
+    if (dto.auth_config !== undefined) {
+      await validateNoPrivateOutboundUrls(dto.auth_config, 'Tool auth_config');
+    }
+
     // Update tool data
     Object.assign(tool, toolData);
     await this.toolRepo.save(tool);
@@ -281,6 +302,10 @@ export class ToolsService {
 
       // Create new actions
       for (const actionDto of actions) {
+        await validateNoPrivateOutboundUrls(
+          actionDto.executor_config,
+          `Action executor_config (${actionDto.name})`,
+        );
         const action = this.toolActionRepo.create({
           tool_id: id,
           name: actionDto.name,
@@ -326,6 +351,11 @@ export class ToolsService {
     // Verify tool exists
     await this.findOne(toolId);
 
+    await validateNoPrivateOutboundUrls(
+      dto.executor_config,
+      `Action executor_config (${dto.name})`,
+    );
+
     const action = this.toolActionRepo.create({
       tool_id: toolId,
       name: dto.name,
@@ -347,6 +377,12 @@ export class ToolsService {
     dto: UpdateToolActionDto,
   ): Promise<ToolAction> {
     const action = await this.findAction(toolId, actionId);
+    if (dto.executor_config !== undefined) {
+      await validateNoPrivateOutboundUrls(
+        dto.executor_config,
+        `Action executor_config (${action.name})`,
+      );
+    }
     Object.assign(action, dto);
     return this.toolActionRepo.save(action);
   }

@@ -16,6 +16,7 @@ import { ToolExecutionLog } from './entities/tool-execution-log.entity';
 import { AddWorkspaceToolDto } from './dto/add-workspace-tool.dto';
 import { UpdateWorkspaceToolDto } from './dto/update-workspace-tool.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { validateNoPrivateOutboundUrls } from './utils/tool-config-validation.util';
 
 @Injectable()
 export class WorkspaceToolsService {
@@ -65,6 +66,11 @@ export class WorkspaceToolsService {
       throw new BadRequestException('Tool already added to workspace');
     }
 
+    await validateNoPrivateOutboundUrls(
+      dto.config_override,
+      'Workspace tool config_override',
+    );
+
     const workspaceTool = this.workspaceToolRepo.create({
       workspace_id: workspaceId,
       tool_id: dto.tool_id,
@@ -91,6 +97,10 @@ export class WorkspaceToolsService {
       workspaceTool.is_enabled = dto.is_enabled;
     }
     if (dto.config_override !== undefined) {
+      await validateNoPrivateOutboundUrls(
+        dto.config_override,
+        'Workspace tool config_override',
+      );
       workspaceTool.config_override = dto.config_override;
     }
 
@@ -141,6 +151,12 @@ export class WorkspaceToolsService {
 
     const { actions, ...toolData } = dto;
 
+    await validateNoPrivateOutboundUrls(
+      dto.executor_config,
+      'Tool executor_config',
+    );
+    await validateNoPrivateOutboundUrls(dto.auth_config, 'Tool auth_config');
+
     // 1. Create Tool (Force category='custom'), không spread actions để lưu thủ công kèm card_config
     const tool = this.toolRepo.create({
       ...toolData,
@@ -153,6 +169,10 @@ export class WorkspaceToolsService {
     // 1b. Tạo từng action (có card_config) để cards hoạt động
     if (actions && actions.length > 0) {
       for (const actionDto of actions) {
+        await validateNoPrivateOutboundUrls(
+          actionDto.executor_config,
+          `Action executor_config (${actionDto.name})`,
+        );
         const action = this.toolActionRepo.create({
           tool_id: savedTool.id,
           name: actionDto.name,

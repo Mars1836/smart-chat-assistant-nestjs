@@ -95,6 +95,39 @@ export class WidgetSecurityService {
     return { chatbot, widgetConfig };
   }
 
+  async resolveCorsForChatbot(
+    req: Request,
+    chatbotId: string,
+  ): Promise<{
+    allowed: boolean;
+    origin: string | null;
+  }> {
+    const chatbot = await this.chatbotRepo.findOne({
+      where: { id: chatbotId },
+    });
+
+    if (!chatbot || !chatbot.enabled) {
+      return { allowed: false, origin: null };
+    }
+
+    const rawConfig = (chatbot.widget_config ??
+      {}) as Partial<ChatbotWidgetConfig>;
+    const widgetConfig: ChatbotWidgetConfig = {
+      ui: rawConfig.ui ?? null,
+      security: this.normalizeSecurityConfig(rawConfig.security),
+    };
+
+    const { origin, originHostname } = this.extractOrigin(req);
+    const ip = this.extractIp(req);
+
+    try {
+      this.checkWhitelist(widgetConfig.security, origin, originHostname, ip);
+      return { allowed: true, origin };
+    } catch {
+      return { allowed: false, origin };
+    }
+  }
+
   private normalizeSecurityConfig(
     security?: Partial<ChatbotWidgetSecurityConfig> | null,
   ): ChatbotWidgetSecurityConfig {

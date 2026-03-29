@@ -1,9 +1,6 @@
 import { IsString, IsOptional, IsUUID, IsObject } from 'class-validator';
 
 export class WidgetChatDto {
-  @IsUUID()
-  chatbotId: string;
-
   @IsString()
   message: string;
 

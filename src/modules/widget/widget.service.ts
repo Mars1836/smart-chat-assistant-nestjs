@@ -38,14 +38,14 @@ export class WidgetService {
     };
   }
 
-  async chat(dto: WidgetChatDto): Promise<{
+  async chat(chatbotId: string, dto: WidgetChatDto): Promise<{
     response: string;
     conversation_id: string;
     files?: any[];
     cards?: any[];
   }> {
     const chatbot = await this.chatbotRepo.findOne({
-      where: { id: dto.chatbotId },
+      where: { id: chatbotId },
     });
 
     if (!chatbot || !chatbot.enabled) {
