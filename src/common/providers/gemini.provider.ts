@@ -40,6 +40,20 @@ export class GeminiProvider implements ILLMProvider {
     this.genAI = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
+  private normalizeModelName(model: string): string {
+    if (!model) return model;
+
+    if (model.startsWith('models/')) {
+      return model.slice('models/'.length);
+    }
+
+    if (model.startsWith('gemini:')) {
+      return model.slice('gemini:'.length);
+    }
+
+    return model;
+  }
+
   async generateResponse(
     model: string,
     prompt: string,
@@ -55,6 +69,7 @@ export class GeminiProvider implements ILLMProvider {
     config?: LLMConfig,
   ): Promise<LLMResponse> {
     try {
+      const normalizedModel = this.normalizeModelName(model);
       const geminiMessages: GeminiMessage[] = [];
 
       // 1. System Instruction
@@ -136,7 +151,7 @@ export class GeminiProvider implements ILLMProvider {
       }
 
       const response = await fetch(
-        `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${normalizedModel}:generateContent?key=${this.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -282,10 +282,9 @@ export class ChatbotsController {
   @ApiResponse({
     status: 200,
     description: 'List of available AI models',
-    type: [String],
   })
   listModels() {
-    return this.chatbotsService.listModels();
+    return this.chatbotsService.listModelsForSelection();
   }
 
   @Get('_/test')

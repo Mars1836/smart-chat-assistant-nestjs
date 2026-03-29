@@ -63,6 +63,40 @@ export class ChatbotsService extends BaseService<Chatbot> {
     return this.chatbotRepo;
   }
 
+  private getProviderFromModel(provider: string | null, model: string): string {
+    if (provider) return provider;
+    if (model.startsWith('gemini:')) return 'gemini';
+    if (model.startsWith('openai:')) return 'openai';
+    return 'unknown';
+  }
+
+  private normalizeModelName(model: string): string {
+    if (model.startsWith('models/')) {
+      return model.slice('models/'.length);
+    }
+
+    const separatorIndex = model.indexOf(':');
+    return separatorIndex >= 0 ? model.slice(separatorIndex + 1) : model;
+  }
+
+  async listModelsForSelection(): Promise<
+    { provider: string; model: string; value: string; label: string }[]
+  > {
+    const rows = await this.llmModelService.findAllForPricing();
+
+    return rows.map((row) => {
+      const provider = this.getProviderFromModel(row.provider, row.model);
+      const model = this.normalizeModelName(row.model);
+
+      return {
+        provider,
+        model,
+        value: model,
+        label: row.display_name ?? model,
+      };
+    });
+  }
+
   /**
    * Tạo chatbot mới cho workspace
    */
