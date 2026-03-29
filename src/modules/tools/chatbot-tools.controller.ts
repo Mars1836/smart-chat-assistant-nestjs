@@ -169,8 +169,7 @@ export class ChatbotToolsController {
   @Delete(':toolId')
   @ApiOperation({
     summary: 'Xóa tool khỏi chatbot',
-    description:
-      'Xóa ChatbotTool record và tất cả ChatbotToolAction liên quan',
+    description: 'Xóa ChatbotTool record và tất cả ChatbotToolAction liên quan',
   })
   @ApiResponse({
     status: 204,

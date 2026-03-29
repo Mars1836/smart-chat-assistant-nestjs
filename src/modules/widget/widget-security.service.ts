@@ -7,7 +7,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Request } from 'express';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
-import { ChatbotWidgetConfig, ChatbotWidgetSecurityConfig } from './widget-security.types';
+import {
+  ChatbotWidgetConfig,
+  ChatbotWidgetSecurityConfig,
+} from './widget-security.types';
 import { RedisRateLimiterService } from '../../common/rate-limiter/redis-rate-limiter.service';
 
 @Injectable()
@@ -34,7 +37,8 @@ export class WidgetSecurityService {
       throw new ForbiddenException('Chatbot not found or disabled');
     }
 
-    const rawConfig = (chatbot.widget_config ?? {}) as Partial<ChatbotWidgetConfig>;
+    const rawConfig = (chatbot.widget_config ??
+      {}) as Partial<ChatbotWidgetConfig>;
     const widgetConfig: ChatbotWidgetConfig = {
       ui: rawConfig.ui ?? null,
       security: this.normalizeSecurityConfig(rawConfig.security),
@@ -74,7 +78,8 @@ export class WidgetSecurityService {
       throw new ForbiddenException('Chatbot not found or disabled');
     }
 
-    const rawConfig = (chatbot.widget_config ?? {}) as Partial<ChatbotWidgetConfig>;
+    const rawConfig = (chatbot.widget_config ??
+      {}) as Partial<ChatbotWidgetConfig>;
     const widgetConfig: ChatbotWidgetConfig = {
       ui: rawConfig.ui ?? null,
       security: this.normalizeSecurityConfig(rawConfig.security),
@@ -118,7 +123,10 @@ export class WidgetSecurityService {
     };
   }
 
-  private extractOrigin(req: Request): { origin: string | null; originHostname: string | null } {
+  private extractOrigin(req: Request): {
+    origin: string | null;
+    originHostname: string | null;
+  } {
     const originHeader = (req.headers['origin'] ??
       req.headers['referer'] ??
       null) as string | null;

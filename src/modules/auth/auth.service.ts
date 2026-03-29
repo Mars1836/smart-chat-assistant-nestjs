@@ -31,7 +31,10 @@ export class AuthService {
     private readonly systemRoleRepository: Repository<SystemRole>,
   ) {}
 
-  private signTokens(userId: string, email: string): {
+  private signTokens(
+    userId: string,
+    email: string,
+  ): {
     accessToken: string;
     refreshToken: string;
   } {
@@ -223,10 +226,7 @@ export class AuthService {
     };
   }
 
-  async changePassword(
-    email: string,
-    newPassword: string,
-  ): Promise<void> {
+  async changePassword(email: string, newPassword: string): Promise<void> {
     const user = await this.userRepository.findOne({
       where: { email, is_deleted: false },
     });

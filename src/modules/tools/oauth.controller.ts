@@ -47,7 +47,10 @@ export class OAuthController {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'OAuth authorization URL' },
-        state: { type: 'string', description: 'State token for CSRF protection' },
+        state: {
+          type: 'string',
+          description: 'State token for CSRF protection',
+        },
       },
     },
   })
@@ -156,7 +159,11 @@ export class OAuthController {
       id: c.id,
       tool_id: c.tool_id,
       tool: c.tool
-        ? { id: c.tool.id, name: c.tool.name, display_name: c.tool.display_name }
+        ? {
+            id: c.tool.id,
+            name: c.tool.name,
+            display_name: c.tool.display_name,
+          }
         : null,
       provider: c.provider,
       profile: c.profile,
@@ -184,8 +191,7 @@ export class OAuthController {
     @Query('error') error: string,
     @Res() res: Response,
   ): Promise<void> {
-    const frontendUrl =
-      process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
     if (error) {
       // User denied access or other error
@@ -218,8 +224,7 @@ export class OAuthController {
   @Get('oauth/callback/json')
   @ApiOperation({
     summary: 'OAuth callback (JSON response)',
-    description:
-      'For SPA popup flow. Returns JSON instead of redirect.',
+    description: 'For SPA popup flow. Returns JSON instead of redirect.',
   })
   @ApiQuery({ name: 'code', required: true })
   @ApiQuery({ name: 'state', required: true })

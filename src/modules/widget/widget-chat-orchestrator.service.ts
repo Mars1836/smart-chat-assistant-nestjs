@@ -40,7 +40,10 @@ const WidgetChatGraphState = Annotation.Root({
   systemInstruction: Annotation<string>,
 
   geminiMessages: Annotation<GeminiMessage[]>({
-    reducer: (left: GeminiMessage[], right: GeminiMessage | GeminiMessage[]) => {
+    reducer: (
+      left: GeminiMessage[],
+      right: GeminiMessage | GeminiMessage[],
+    ) => {
       if (Array.isArray(right)) return left.concat(right);
       return left.concat([right]);
     },
@@ -48,8 +51,10 @@ const WidgetChatGraphState = Annotation.Root({
   }),
 
   functionCalls: Annotation<GeminiFunctionCall[] | null>({
-    reducer: (_left: GeminiFunctionCall[] | null, right: GeminiFunctionCall[] | null) =>
-      right,
+    reducer: (
+      _left: GeminiFunctionCall[] | null,
+      right: GeminiFunctionCall[] | null,
+    ) => right,
     default: () => null,
   }),
 
@@ -84,7 +89,8 @@ const WidgetChatGraphState = Annotation.Root({
 
   /** Cards chung (product / article / link) từ tool để FE widget render card có ảnh + link */
   cards: Annotation<any[]>({
-    reducer: (_left: any[], right: any[]) => (Array.isArray(right) ? right : []),
+    reducer: (_left: any[], right: any[]) =>
+      Array.isArray(right) ? right : [],
     default: () => [],
   }),
 
@@ -96,9 +102,10 @@ const WidgetChatGraphState = Annotation.Root({
     reducer: (left: number, right: number) => left + (right ?? 0),
     default: () => 0,
   }),
-  toolsUsedLog: Annotation<{ tool_name: string; args: Record<string, any>; result: any }[]>({
-    reducer: (left, right) =>
-      left.concat(Array.isArray(right) ? right : []),
+  toolsUsedLog: Annotation<
+    { tool_name: string; args: Record<string, any>; result: any }[]
+  >({
+    reducer: (left, right) => left.concat(Array.isArray(right) ? right : []),
     default: () => [],
   }),
 });
@@ -123,7 +130,8 @@ export class WidgetChatOrchestratorService {
       'router_step',
       (state: typeof WidgetChatGraphState.State) => {
         if (state.turn >= state.maxTurns) return 'finalize';
-        if (state.functionCalls && state.functionCalls.length > 0) return 'execute_tools';
+        if (state.functionCalls && state.functionCalls.length > 0)
+          return 'execute_tools';
         return 'answer_step';
       },
       {
@@ -218,12 +226,17 @@ export class WidgetChatOrchestratorService {
       role: msg.role as any,
       content: msg.content || (msg as any).parts?.[0]?.text,
       functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
-      functionResponse: msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
-        ? {
-            name: msg.functionResponse?.name ?? (msg as any).parts[0].functionResponse.name,
-            response: msg.functionResponse?.response ?? (msg as any).parts[0].functionResponse.response,
-          }
-        : undefined,
+      functionResponse:
+        msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
+          ? {
+              name:
+                msg.functionResponse?.name ??
+                (msg as any).parts[0].functionResponse.name,
+              response:
+                msg.functionResponse?.response ??
+                (msg as any).parts[0].functionResponse.response,
+            }
+          : undefined,
     }));
 
     const routerSystemInstruction =
@@ -236,16 +249,12 @@ export class WidgetChatOrchestratorService {
       'KHÔNG được trả lời nội dung cuối cùng cho người dùng ở bước này, chỉ nên tạo các function call phù hợp. ' +
       'Nếu thực sự không cần tools (câu hỏi quá đơn giản, chỉ cần trả lời trực tiếp), bạn có thể không tạo function call nào.';
 
-    const response = await provider.chat(
-      state.chatbot.llm_model,
-      messages,
-      {
-        temperature: state.chatbot.temperature,
-        maxTokens: state.chatbot.max_tokens,
-        systemInstruction: routerSystemInstruction,
-        tools: state.tools as any,
-      },
-    );
+    const response = await provider.chat(state.chatbot.llm_model, messages, {
+      temperature: state.chatbot.temperature,
+      maxTokens: state.chatbot.max_tokens,
+      systemInstruction: routerSystemInstruction,
+      tools: state.tools as any,
+    });
 
     // Billing: charge usage per workspace if usage info is available (router phase)
     if (response.usage && state.workspaceId) {
@@ -317,12 +326,17 @@ export class WidgetChatOrchestratorService {
       role: msg.role as any,
       content: msg.content || (msg as any).parts?.[0]?.text,
       functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
-      functionResponse: msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
-        ? {
-            name: msg.functionResponse?.name ?? (msg as any).parts[0].functionResponse.name,
-            response: msg.functionResponse?.response ?? (msg as any).parts[0].functionResponse.response,
-          }
-        : undefined,
+      functionResponse:
+        msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
+          ? {
+              name:
+                msg.functionResponse?.name ??
+                (msg as any).parts[0].functionResponse.name,
+              response:
+                msg.functionResponse?.response ??
+                (msg as any).parts[0].functionResponse.response,
+            }
+          : undefined,
     }));
 
     const answerSystemInstruction =
@@ -332,16 +346,12 @@ export class WidgetChatOrchestratorService {
       'đã được Router Agent gọi trước đó, sau đó soạn câu trả lời cuối cùng, rõ ràng, cô đọng và hữu ích cho người dùng widget. ' +
       'Ở bước này, bạn KHÔNG ĐƯỢC gọi thêm tools mới; hãy chỉ sử dụng các thông tin đã có trong messages hiện tại.';
 
-    const response = await provider.chat(
-      state.chatbot.llm_model,
-      messages,
-      {
-        temperature: state.chatbot.temperature,
-        maxTokens: state.chatbot.max_tokens,
-        systemInstruction: answerSystemInstruction,
-        // Không truyền tools vào Answer Agent để tránh việc gọi thêm tools vòng 2
-      },
-    );
+    const response = await provider.chat(state.chatbot.llm_model, messages, {
+      temperature: state.chatbot.temperature,
+      maxTokens: state.chatbot.max_tokens,
+      systemInstruction: answerSystemInstruction,
+      // Không truyền tools vào Answer Agent để tránh việc gọi thêm tools vòng 2
+    });
 
     // Billing: charge usage per workspace if usage info is available (answer phase)
     if (response.usage && state.workspaceId) {
@@ -410,11 +420,19 @@ export class WidgetChatOrchestratorService {
       };
 
       try {
-        return await this.toolExecutorService.execute(call.name, call.args, ctx);
+        return await this.toolExecutorService.execute(
+          call.name,
+          call.args,
+          ctx,
+        );
       } catch (err: any) {
         // Retry once (simple policy)
         try {
-          return await this.toolExecutorService.execute(call.name, call.args, ctx);
+          return await this.toolExecutorService.execute(
+            call.name,
+            call.args,
+            ctx,
+          );
         } catch (err2: any) {
           return {
             error: err2?.message ?? String(err2),
@@ -436,7 +454,8 @@ export class WidgetChatOrchestratorService {
         // Helper to detect type
         const isImage = (filename: string, mime?: string) => {
           if (mime && mime.startsWith('image/')) return true;
-          if (filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename)) return true;
+          if (filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename))
+            return true;
           return false;
         };
 
@@ -472,14 +491,21 @@ export class WidgetChatOrchestratorService {
     // Card: dùng cấu hình card theo từng tool/action giống chat orchestrator
     const cardConfigByCall = new Map<
       string,
-      { enabled?: boolean; list_path?: string; field_mapping?: Record<string, string> }
+      {
+        enabled?: boolean;
+        list_path?: string;
+        field_mapping?: Record<string, string>;
+      }
     >();
     for (const call of calls) {
       const sep = call.name.indexOf('__');
       if (sep > 0 && sep < call.name.length - 1) {
         const toolName = call.name.slice(0, sep);
         const actionName = call.name.slice(sep + 2);
-        const config = await this.toolRegistryService.getCardConfig(toolName, actionName);
+        const config = await this.toolRegistryService.getCardConfig(
+          toolName,
+          actionName,
+        );
         if (config) cardConfigByCall.set(call.name, config);
       }
     }

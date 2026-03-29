@@ -30,9 +30,7 @@ export class ToolRegistryService {
       relations: ['tool', 'tool.actions'],
     });
 
-    return chatbotTools
-      .map((ct) => ct.tool)
-      .filter((tool) => tool.is_enabled);
+    return chatbotTools.map((ct) => ct.tool).filter((tool) => tool.is_enabled);
   }
 
   /**
@@ -75,22 +73,26 @@ export class ToolRegistryService {
         continue;
       }
 
-      this.logger.debug(`Checking actions for tool: ${ct.tool.name}, action count: ${ct.tool.actions?.length}`);
+      this.logger.debug(
+        `Checking actions for tool: ${ct.tool.name}, action count: ${ct.tool.actions?.length}`,
+      );
 
       for (const action of ct.tool.actions || []) {
         if (action.is_enabled === false) {
-           this.logger.debug(`Action ${action.name} is disabled (system-wide)`);
-           continue;
+          this.logger.debug(`Action ${action.name} is disabled (system-wide)`);
+          continue;
         }
 
         // Check specific permission
         const cta = actionConfigMap.get(action.id);
-        
-        // If specific config exists, use its is_enabled. 
+
+        // If specific config exists, use its is_enabled.
         // If NO specific config exists, default to true (since tool is enabled).
         const isActionEnabled = cta ? cta.is_enabled : true;
 
-        this.logger.debug(`Action ${action.name} of tool ${ct.tool.name} -> Specific Config: ${!!cta}, Final Enabled: ${isActionEnabled}`);
+        this.logger.debug(
+          `Action ${action.name} of tool ${ct.tool.name} -> Specific Config: ${!!cta}, Final Enabled: ${isActionEnabled}`,
+        );
 
         if (isActionEnabled) {
           result.push({

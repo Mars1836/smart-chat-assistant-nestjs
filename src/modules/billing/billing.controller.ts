@@ -9,7 +9,12 @@ import {
   MessageEvent,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -47,7 +52,10 @@ export class BillingController {
       'Giao dịch tiền (topup, refund, adjustment) và lịch sử dùng token (usage). Phân trang, lọc theo type.',
   })
   @ApiResponse({ status: 200, description: 'Paginated list of transactions' })
-  @ApiResponse({ status: 403, description: 'Chỉ Owner hoặc Admin workspace mới xem được' })
+  @ApiResponse({
+    status: 403,
+    description: 'Chỉ Owner hoặc Admin workspace mới xem được',
+  })
   async getTransactions(
     @Param('workspaceId') workspaceId: string,
     @Query('page') page?: number,
@@ -89,4 +97,3 @@ export class BillingController {
     return this.billingService.getWalletStream(workspaceId);
   }
 }
-

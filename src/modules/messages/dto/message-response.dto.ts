@@ -68,6 +68,7 @@ export class MessageResponseDto {
       },
     ],
   })
-  tools_used: { tool_name: string; args: Record<string, any>; result: any }[] | null;
+  tools_used:
+    | { tool_name: string; args: Record<string, any>; result: any }[]
+    | null;
 }
-

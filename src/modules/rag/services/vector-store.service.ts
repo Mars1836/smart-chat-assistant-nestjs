@@ -57,7 +57,11 @@ export class VectorStoreService {
   async search(
     embedding: number[],
     limit = 5,
-    options?: { workspaceId?: string; knowledgeIds?: string[]; minScore?: number },
+    options?: {
+      workspaceId?: string;
+      knowledgeIds?: string[];
+      minScore?: number;
+    },
   ): Promise<any[]> {
     try {
       let filter: Record<string, any> | undefined;
@@ -130,7 +134,9 @@ export class VectorStoreService {
           const workspaceId = docToWorkspace.get(documentId);
           if (
             workspaceId &&
-            content?.startsWith(WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX)
+            content?.startsWith(
+              WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX,
+            )
           ) {
             try {
               const decrypted =

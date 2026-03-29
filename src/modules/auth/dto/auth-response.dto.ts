@@ -36,7 +36,8 @@ export class AuthResponseDto {
   email: string;
 
   @ApiProperty({
-    description: 'Vai trò hệ thống: "admin" hoặc "user". null nếu chưa gán. FE dùng để chuyển trang (admin vs user).',
+    description:
+      'Vai trò hệ thống: "admin" hoặc "user". null nếu chưa gán. FE dùng để chuyển trang (admin vs user).',
     example: 'user',
     enum: ['admin', 'user'],
     nullable: true,
@@ -79,7 +80,8 @@ export class ProfileResponseDto {
   name: string;
 
   @ApiProperty({
-    description: 'Vai trò hệ thống: "admin" (quản trị viên) hoặc "user" (người dùng thường). null nếu chưa gán role.',
+    description:
+      'Vai trò hệ thống: "admin" (quản trị viên) hoặc "user" (người dùng thường). null nếu chưa gán role.',
     example: 'user',
     enum: ['admin', 'user'],
     nullable: true,

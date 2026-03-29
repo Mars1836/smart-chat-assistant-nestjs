@@ -66,8 +66,7 @@ export class RegisterDto {
   avatar_url?: string;
 
   @ApiProperty({
-    description:
-      'Client kind: web or mobile. Prefer header X-Client-Type.',
+    description: 'Client kind: web or mobile. Prefer header X-Client-Type.',
     enum: ['web', 'mobile'],
     required: false,
     default: 'web',

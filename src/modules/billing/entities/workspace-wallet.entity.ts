@@ -20,4 +20,3 @@ export class WorkspaceWallet extends BaseEntity {
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status: 'active' | 'suspended';
 }
-

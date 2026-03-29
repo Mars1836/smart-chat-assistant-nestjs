@@ -41,9 +41,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
   // =====================
   // Cleanup removed tools (safe to run repeatedly)
   // =====================
-  const removedToolNames = [
-    'pollinations_image_generator',
-  ] as const;
+  const removedToolNames = ['pollinations_image_generator'] as const;
 
   const removedTools = await toolRepo.find({
     where: { name: In(removedToolNames) },
@@ -289,7 +287,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_current_time',
           display_name: 'Get Current Time',
-          description: 'Get the current date and time (includes weekday, day, month, year, time)',
+          description:
+            'Get the current date and time (includes weekday, day, month, year, time)',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -335,7 +334,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_current_weather',
           display_name: 'Get Current Weather',
-          description: 'Get current weather data including temperature, conditions, humidity, wind, etc. for a specific city.',
+          description:
+            'Get current weather data including temperature, conditions, humidity, wind, etc. for a specific city.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -345,7 +345,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
               },
               units: {
                 type: 'string',
-                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
+                description:
+                  'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
                 enum: ['metric', 'imperial'],
                 default: 'metric',
               },
@@ -370,7 +371,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_forecast_weather',
           display_name: 'Get 5-Day Forecast',
-          description: 'Get weather forecast for the next 5 days with 3-hour intervals.',
+          description:
+            'Get weather forecast for the next 5 days with 3-hour intervals.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -380,7 +382,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
               },
               units: {
                 type: 'string',
-                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
+                description:
+                  'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
                 enum: ['metric', 'imperial'],
                 default: 'metric',
               },
@@ -403,7 +406,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_air_pollution',
           display_name: 'Get Air Pollution',
-          description: 'Get current, forecast, and historical air pollution data (AQI, CO, NO, NO2, O3, SO2, PM2.5, PM10, NH3). Requires latitude and longitude.',
+          description:
+            'Get current, forecast, and historical air pollution data (AQI, CO, NO, NO2, O3, SO2, PM2.5, PM10, NH3). Requires latitude and longitude.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -427,7 +431,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
                 lon: '{{lon}}',
               },
             },
-            success_message: 'Air pollution data retrieved. AQI: {{_response.list.0.main.aqi}}',
+            success_message:
+              'Air pollution data retrieved. AQI: {{_response.list.0.main.aqi}}',
           },
           sort_order: 2,
         },

@@ -1,10 +1,15 @@
-import { Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { BaseToolExecutor, ExecutionContext } from './base-executor';
 import { OAuthService } from '../oauth.service';
+import { safeFetchWithSsrfProtection } from '../utils/ssrf-protection.util';
 
 /**
  * Action executor configuration schema (stored in tool_actions.executor_config)
- * 
+ *
  * Example for Gmail list_emails:
  * {
  *   "method": "GET",
@@ -17,7 +22,7 @@ import { OAuthService } from '../oauth.service';
  *     }
  *   }
  * }
- * 
+ *
  * Example for Gmail send_email:
  * {
  *   "method": "POST",
@@ -91,7 +96,7 @@ export class GenericApiExecutor extends BaseToolExecutor {
 
     // Get authentication token if needed
     const authType = this.config.auth_type || 'none';
-    let authHeaders: Record<string, string> = {};
+    const authHeaders: Record<string, string> = {};
 
     if (authType === 'oauth2' && this.oauthService) {
       const token = await this.getOAuthToken(context, params._toolId);
@@ -99,15 +104,18 @@ export class GenericApiExecutor extends BaseToolExecutor {
     } else if (authType === 'api_key') {
       const apiKeyConfig = this.config.api_key || {};
       const apiKeyValue = apiKeyConfig.value || params._apiKey;
-      
+
       if (apiKeyValue) {
         if (apiKeyConfig.param_type === 'query') {
           // Will be added to query string later
           params._injectedQueryAuth = {
-            [apiKeyConfig.param_name || 'key']: apiKeyValue
+            [apiKeyConfig.param_name || 'key']: apiKeyValue,
           };
         } else {
-          const headerName = apiKeyConfig.param_name || this.config.api_key_header || 'X-API-Key';
+          const headerName =
+            apiKeyConfig.param_name ||
+            this.config.api_key_header ||
+            'X-API-Key';
           authHeaders[headerName] = apiKeyValue;
         }
       }
@@ -169,7 +177,10 @@ export class GenericApiExecutor extends BaseToolExecutor {
 
     // Build body
     let body: any = null;
-    if (['POST', 'PUT', 'PATCH'].includes(method) && actionConfig.params?.body) {
+    if (
+      ['POST', 'PUT', 'PATCH'].includes(method) &&
+      actionConfig.params?.body
+    ) {
       body = this.buildBody(actionConfig.params.body, processedParams);
       headers['Content-Type'] = actionConfig.content_type || 'application/json';
     }
@@ -186,10 +197,10 @@ export class GenericApiExecutor extends BaseToolExecutor {
     if (actionConfig.success_message) {
       return {
         success: true,
-        message: this.substituteTemplate(
-          actionConfig.success_message,
-          { ...processedParams, _response: response },
-        ),
+        message: this.substituteTemplate(actionConfig.success_message, {
+          ...processedParams,
+          _response: response,
+        }),
         data: response,
       };
     }
@@ -281,7 +292,7 @@ export class GenericApiExecutor extends BaseToolExecutor {
       // Use substituteTemplate to allow {{param}} syntax in query config
       // This matches the behaviour documented in the class comment examples
       const value = this.substituteTemplate(paramRef, params);
-      
+
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(queryKey, value);
       }
@@ -289,7 +300,9 @@ export class GenericApiExecutor extends BaseToolExecutor {
 
     // Add injected auth params (e.g. API Key)
     if (params._injectedQueryAuth) {
-      for (const [key, value] of Object.entries(params._injectedQueryAuth as Record<string, string>)) {
+      for (const [key, value] of Object.entries(
+        params._injectedQueryAuth as Record<string, string>,
+      )) {
         queryParams.append(key, value);
       }
     }
@@ -316,10 +329,7 @@ export class GenericApiExecutor extends BaseToolExecutor {
   /**
    * Deep substitute {{param}} in object
    */
-  private deepSubstitute(
-    obj: any,
-    params: Record<string, any>,
-  ): any {
+  private deepSubstitute(obj: any, params: Record<string, any>): any {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -434,7 +444,10 @@ export class GenericApiExecutor extends BaseToolExecutor {
     const headers: string[] = [];
 
     if (params.to) {
-      const to = String(params.to).split(',').map((e) => e.trim()).join(', ');
+      const to = String(params.to)
+        .split(',')
+        .map((e) => e.trim())
+        .join(', ');
       headers.push(`To: ${to}`);
     }
 
@@ -530,7 +543,7 @@ export class GenericApiExecutor extends BaseToolExecutor {
     // Simple dot notation for now
     // e.g., "messages" -> response.messages
     // e.g., "data.items[*].name" -> more complex (would need jmespath)
-    
+
     if (!expression || expression === '.') {
       return response;
     }
@@ -570,11 +583,10 @@ export class GenericApiExecutor extends BaseToolExecutor {
       };
 
       if (body !== null && body !== undefined) {
-        options.body =
-          typeof body === 'string' ? body : JSON.stringify(body);
+        options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
 
-      const response = await fetch(url, options);
+      const response = await safeFetchWithSsrfProtection(url, options);
 
       if (!response.ok) {
         const errorText = await response.text();

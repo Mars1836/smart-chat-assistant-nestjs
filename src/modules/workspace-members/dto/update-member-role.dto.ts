@@ -6,7 +6,11 @@ export class UpdateMemberRoleDto {
   @ApiProperty({
     description: 'Tên vai trò mới (Admin, Editor, Viewer)',
     example: 'Editor',
-    enum: [WORKSPACE_ROLES.ADMIN, WORKSPACE_ROLES.EDITOR, WORKSPACE_ROLES.VIEWER],
+    enum: [
+      WORKSPACE_ROLES.ADMIN,
+      WORKSPACE_ROLES.EDITOR,
+      WORKSPACE_ROLES.VIEWER,
+    ],
   })
   @IsNotEmpty()
   @IsString()

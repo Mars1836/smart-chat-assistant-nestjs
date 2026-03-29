@@ -97,7 +97,10 @@ export class WorkspaceToolsService {
     return this.workspaceToolRepo.save(workspaceTool);
   }
 
-  async removeWorkspaceTool(workspaceId: string, toolId: string): Promise<void> {
+  async removeWorkspaceTool(
+    workspaceId: string,
+    toolId: string,
+  ): Promise<void> {
     const workspaceTool = await this.findOne(workspaceId, toolId);
     if (!workspaceTool) {
       throw new NotFoundException('Tool not installed in workspace');

@@ -20,7 +20,13 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Chatbot, Workspace, Conversation, Message, MessageAttachment]),
+    TypeOrmModule.forFeature([
+      Chatbot,
+      Workspace,
+      Conversation,
+      Message,
+      MessageAttachment,
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

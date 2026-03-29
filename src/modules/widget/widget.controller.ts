@@ -61,14 +61,15 @@ export class WidgetController {
         chatbotId,
       );
 
-    res.status(HttpStatus.OK).json(
-      this.widgetService.getPublicConfig(chatbot, widgetConfig),
-    );
+    res
+      .status(HttpStatus.OK)
+      .json(this.widgetService.getPublicConfig(chatbot, widgetConfig));
   }
 
   @Post('chat')
   @ApiOperation({
-    summary: 'Public chat cho widget (không cần JWT, có whitelist + rate limit)',
+    summary:
+      'Public chat cho widget (không cần JWT, có whitelist + rate limit)',
     description:
       'Endpoint public dành cho widget embed từ website bên ngoài.\n\n' +
       '- Backend sẽ kiểm tra origin/IP theo cấu hình whitelist của từng chatbot.\n' +
@@ -93,9 +94,9 @@ export class WidgetController {
   ): Promise<void> {
     const { rateLimited } =
       await this.widgetSecurityService.validateRequestAndGetChatbot(
-      req,
-      dto.chatbotId,
-    );
+        req,
+        dto.chatbotId,
+      );
 
     if (rateLimited) {
       res.status(HttpStatus.TOO_MANY_REQUESTS).json({
@@ -115,4 +116,3 @@ export class WidgetController {
     });
   }
 }
-

@@ -74,7 +74,10 @@ export class OAuthService {
     const oauthConfig = tool.auth_config.oauth || {};
     const wsOverride = workspaceTool?.config_override?.oauth || {};
 
-    const baseUrl = this.configService.get<string>('APP_URL', 'http://localhost:4000');
+    const baseUrl = this.configService.get<string>(
+      'APP_URL',
+      'http://localhost:4000',
+    );
 
     return {
       client_id:
@@ -88,8 +91,7 @@ export class OAuthService {
       authorization_url:
         oauthConfig.authorization_url ||
         'https://accounts.google.com/o/oauth2/v2/auth',
-      token_url:
-        oauthConfig.token_url || 'https://oauth2.googleapis.com/token',
+      token_url: oauthConfig.token_url || 'https://oauth2.googleapis.com/token',
       scopes: oauthConfig.scopes || [
         'https://www.googleapis.com/auth/gmail.readonly',
         'https://www.googleapis.com/auth/gmail.send',
@@ -259,7 +261,9 @@ export class OAuthService {
   /**
    * Get Google user info using access token.
    */
-  private async getGoogleUserInfo(accessToken: string): Promise<GoogleUserInfo> {
+  private async getGoogleUserInfo(
+    accessToken: string,
+  ): Promise<GoogleUserInfo> {
     const response = await fetch(
       'https://www.googleapis.com/oauth2/v2/userinfo',
       {

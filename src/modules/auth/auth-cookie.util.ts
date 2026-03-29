@@ -12,10 +12,9 @@ export const REFRESH_COOKIE_PATH = '/auth';
  * Cấu hình: đặt REFRESH_COOKIE_CROSS_SITE=true hoặc REFRESH_COOKIE_SAMESITE=none
  * (kèm HTTPS / REFRESH_COOKIE_SECURE=true nếu không phải production).
  */
-function baseCookieOptions(configService: ConfigService): Pick<
-  CookieOptions,
-  'httpOnly' | 'secure' | 'sameSite' | 'path' | 'domain'
-> {
+function baseCookieOptions(
+  configService: ConfigService,
+): Pick<CookieOptions, 'httpOnly' | 'secure' | 'sameSite' | 'path' | 'domain'> {
   const explicit = configService.get<string>('REFRESH_COOKIE_SAMESITE');
   const crossSite =
     configService.get<string>('REFRESH_COOKIE_CROSS_SITE') === 'true';

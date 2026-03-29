@@ -61,7 +61,9 @@ export class WorkspaceMembersService {
     });
 
     if (!requester || !requester.workspaceRole) {
-       throw new ForbiddenException('Requester is not a member of this workspace');
+      throw new ForbiddenException(
+        'Requester is not a member of this workspace',
+      );
     }
 
     const requesterRoleName = requester.workspaceRole.name;
@@ -69,24 +71,24 @@ export class WorkspaceMembersService {
 
     // Rule 1: Cannot change your own role
     if (member.id === requester.id) {
-       throw new ForbiddenException('Cannot change your own role');
+      throw new ForbiddenException('Cannot change your own role');
     }
 
     // Rule 2: Nobody can modify Owner
     if (targetRoleName === 'Owner') {
-       throw new ForbiddenException('Cannot modify Workspace Owner role');
+      throw new ForbiddenException('Cannot modify Workspace Owner role');
     }
 
     // Rule 3: Only Owner can grant Admin role
     if (roleName === 'Admin' && requesterRoleName !== 'Owner') {
-        throw new ForbiddenException('Only Owner can promote members to Admin');
+      throw new ForbiddenException('Only Owner can promote members to Admin');
     }
 
     // Rule 4: Admin restrictions
     if (requesterRoleName === 'Admin') {
-       if (targetRoleName === 'Admin') {
-          throw new ForbiddenException('Admins cannot modify other Admins');
-       }
+      if (targetRoleName === 'Admin') {
+        throw new ForbiddenException('Admins cannot modify other Admins');
+      }
     }
 
     // 3. Get new role
@@ -99,7 +101,9 @@ export class WorkspaceMembersService {
     }
 
     if (role.name === 'Owner') {
-       throw new ForbiddenException('Cannot change role to Owner. Use transfer ownership instead.');
+      throw new ForbiddenException(
+        'Cannot change role to Owner. Use transfer ownership instead.',
+      );
     }
 
     // 3. Update
@@ -107,7 +111,6 @@ export class WorkspaceMembersService {
     member.workspaceRole = role; // Update relation object so response is correct
     return await this.workspaceMemberRepo.save(member);
   }
-
 
   /**
    * Get all members in workspace

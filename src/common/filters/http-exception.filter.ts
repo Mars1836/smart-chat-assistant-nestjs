@@ -63,15 +63,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message =
-       exception instanceof HttpException
+      exception instanceof HttpException
         ? exception.message
         : 'Internal server error';
 
     if (exception instanceof HttpException) {
-        const response = exception.getResponse();
-        if (typeof response === 'object' && (response as any).message) {
-            message = (response as any).message;
-        }
+      const response = exception.getResponse();
+      if (typeof response === 'object' && (response as any).message) {
+        message = (response as any).message;
+      }
     }
 
     const errorResponse = {
@@ -94,7 +94,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const exceptionResponse = exception.getResponse();
       logDetails.stack = exception.stack;
-      
+
       // Include complete validation error details
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         logDetails.validationErrors = exceptionResponse;
@@ -120,4 +120,3 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json(errorResponse);
   }
 }
-

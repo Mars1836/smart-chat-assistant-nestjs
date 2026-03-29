@@ -35,4 +35,3 @@ export class WorkspaceStatsSummaryDto {
   })
   chatbots_last_30_days: number;
 }
-

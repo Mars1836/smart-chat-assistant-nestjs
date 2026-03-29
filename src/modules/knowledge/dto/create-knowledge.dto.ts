@@ -2,7 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateKnowledgeDto {
-  @ApiProperty({ description: 'Name of the knowledge base', example: 'Product Documentation' })
+  @ApiProperty({
+    description: 'Name of the knowledge base',
+    example: 'Product Documentation',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -13,7 +16,10 @@ export class CreateKnowledgeDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Icon identifier (emoji or icon name)', example: '📚' })
+  @ApiPropertyOptional({
+    description: 'Icon identifier (emoji or icon name)',
+    example: '📚',
+  })
   @IsString()
   @IsOptional()
   @MaxLength(100)

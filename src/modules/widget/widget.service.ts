@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
@@ -34,9 +38,12 @@ export class WidgetService {
     };
   }
 
-  async chat(
-    dto: WidgetChatDto,
-  ): Promise<{ response: string; conversation_id: string; files?: any[]; cards?: any[] }> {
+  async chat(dto: WidgetChatDto): Promise<{
+    response: string;
+    conversation_id: string;
+    files?: any[];
+    cards?: any[];
+  }> {
     const chatbot = await this.chatbotRepo.findOne({
       where: { id: dto.chatbotId },
     });

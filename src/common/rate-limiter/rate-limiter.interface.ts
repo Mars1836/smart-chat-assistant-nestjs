@@ -12,4 +12,3 @@ export interface RateLimiter {
     maxRequests: number,
   ): Promise<RateLimiterCheckResult>;
 }
-

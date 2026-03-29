@@ -29,8 +29,11 @@ export class WorkspaceMemberPermissionsService {
       where: { id: memberId, workspace_id: workspaceId },
     });
     if (!member) throw new NotFoundException('Member not found');
-    
-    return await this.permissionsService.getUserPermissions(workspaceId, member.user_id);
+
+    return await this.permissionsService.getUserPermissions(
+      workspaceId,
+      member.user_id,
+    );
   }
 
   async getDetailedPermissions(workspaceId: string, memberId: string) {
@@ -38,8 +41,11 @@ export class WorkspaceMemberPermissionsService {
       where: { id: memberId, workspace_id: workspaceId },
     });
     if (!member) throw new NotFoundException('Member not found');
-    
-    return await this.permissionsService.getDetailedUserPermissions(workspaceId, member.user_id);
+
+    return await this.permissionsService.getDetailedUserPermissions(
+      workspaceId,
+      member.user_id,
+    );
   }
 
   async listPermissions(workspaceId: string, memberId: string) {
@@ -76,18 +82,18 @@ export class WorkspaceMemberPermissionsService {
 
     // Permissions Logic Checks (Similar to Update Role)
     if (member.id === requester.id) {
-        // Can one revoke their own permission? Maybe.. but let's forbid for safety
-        throw new ForbiddenException('Cannot modify your own permissions');
+      // Can one revoke their own permission? Maybe.. but let's forbid for safety
+      throw new ForbiddenException('Cannot modify your own permissions');
     }
     if (targetRole === 'Owner') {
-        throw new ForbiddenException('Cannot modify permissions of Owner');
+      throw new ForbiddenException('Cannot modify permissions of Owner');
     }
     if (requesterRole === 'Admin' && targetRole === 'Admin') {
-        throw new ForbiddenException('Admins cannot modify Admin permissions');
+      throw new ForbiddenException('Admins cannot modify Admin permissions');
     }
     // Only Admin and Owner can do this (Guarded by Controller usually, but safe here too)
     if (requesterRole !== 'Owner' && requesterRole !== 'Admin') {
-         throw new ForbiddenException('Permission denied');
+      throw new ForbiddenException('Permission denied');
     }
 
     // 3. Find Permission
@@ -115,7 +121,7 @@ export class WorkspaceMemberPermissionsService {
     record.grant_type = action;
     record.granted_by = requesterId;
     record.granted_at = new Date(); // Update timestamp
-    
+
     return await this.memberPermissionRepo.save(record);
   }
 }

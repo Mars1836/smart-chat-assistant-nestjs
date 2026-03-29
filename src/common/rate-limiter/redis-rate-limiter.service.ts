@@ -1,7 +1,15 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, type RedisClientType } from 'redis';
-import type { RateLimiter, RateLimiterCheckResult } from './rate-limiter.interface';
+import type {
+  RateLimiter,
+  RateLimiterCheckResult,
+} from './rate-limiter.interface';
 
 const LUA_SLIDING_WINDOW = `
 -- KEYS[1] = rate key
@@ -55,7 +63,10 @@ export class RedisRateLimiterService
     this.client = createClient({ url });
 
     this.client.on('error', (err) => {
-      this.logger.error('Redis client error in RedisRateLimiterService', err as any);
+      this.logger.error(
+        'Redis client error in RedisRateLimiterService',
+        err as any,
+      );
     });
 
     await this.client.connect();
@@ -114,4 +125,3 @@ export class RedisRateLimiterService
     }
   }
 }
-

@@ -6,20 +6,28 @@ export class AddKnowledgeToChatbotDto {
   @IsUUID()
   knowledge_id: string;
 
-  @ApiPropertyOptional({ description: 'Priority (higher = searched first)', default: 0 })
+  @ApiPropertyOptional({
+    description: 'Priority (higher = searched first)',
+    default: 0,
+  })
   @IsInt()
   @Min(0)
   @IsOptional()
   priority?: number;
 
-  @ApiPropertyOptional({ description: 'Enable/disable this knowledge for chatbot', default: true })
+  @ApiPropertyOptional({
+    description: 'Enable/disable this knowledge for chatbot',
+    default: true,
+  })
   @IsBoolean()
   @IsOptional()
   is_enabled?: boolean;
 }
 
 export class UpdateChatbotKnowledgeDto {
-  @ApiPropertyOptional({ description: 'Enable/disable this knowledge for chatbot' })
+  @ApiPropertyOptional({
+    description: 'Enable/disable this knowledge for chatbot',
+  })
   @IsBoolean()
   @IsOptional()
   is_enabled?: boolean;

@@ -111,7 +111,9 @@ export class LlmModelService {
       entity.price_per_1k_input_tokens = String(dto.price_per_1k_input_tokens);
     }
     if (dto.price_per_1k_output_tokens !== undefined) {
-      entity.price_per_1k_output_tokens = String(dto.price_per_1k_output_tokens);
+      entity.price_per_1k_output_tokens = String(
+        dto.price_per_1k_output_tokens,
+      );
     }
     if (dto.display_name !== undefined) {
       entity.display_name = dto.display_name;

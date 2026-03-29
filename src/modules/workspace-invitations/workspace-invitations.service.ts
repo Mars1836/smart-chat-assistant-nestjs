@@ -54,7 +54,9 @@ export class WorkspaceInvitationsService {
     });
 
     if (!role) {
-      throw new NotFoundException(`Workspace role '${inviteDto.role_name}' not found`);
+      throw new NotFoundException(
+        `Workspace role '${inviteDto.role_name}' not found`,
+      );
     }
 
     // Check if user exists (optional - they might not be registered yet)
@@ -104,7 +106,13 @@ export class WorkspaceInvitationsService {
       const inviterEmail = inviter?.email ?? '';
 
       // Send email
-      this.sendInvitationEmail(inviteDto.email, workspace.name, token, inviterName, inviterEmail);
+      this.sendInvitationEmail(
+        inviteDto.email,
+        workspace.name,
+        token,
+        inviterName,
+        inviterEmail,
+      );
 
       return updated;
     }
@@ -130,7 +138,13 @@ export class WorkspaceInvitationsService {
     const inviterEmail = inviter?.email ?? '';
 
     // Send email
-    this.sendInvitationEmail(inviteDto.email, workspace.name, token, inviterName, inviterEmail);
+    this.sendInvitationEmail(
+      inviteDto.email,
+      workspace.name,
+      token,
+      inviterName,
+      inviterEmail,
+    );
 
     return saved;
   }

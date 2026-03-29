@@ -90,10 +90,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
         createDto.greeting_message ?? 'Xin chào! Tôi có thể giúp gì cho bạn?',
       fallback_message:
         createDto.fallback_message ?? 'Xin lỗi, tôi chưa hiểu câu hỏi của bạn.',
-      conversation_starters:
-        createDto.conversation_starters?.length
-          ? createDto.conversation_starters
-          : DEFAULT_CONVERSATION_STARTERS,
+      conversation_starters: createDto.conversation_starters?.length
+        ? createDto.conversation_starters
+        : DEFAULT_CONVERSATION_STARTERS,
       confidence_threshold: createDto.confidence_threshold ?? 0.7,
       max_context_turns: createDto.max_context_turns ?? 5,
       enable_learning: createDto.enable_learning ?? true,
@@ -244,7 +243,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
     cards: any[];
     processingTime: number;
     token_usage?: { input_tokens: number; output_tokens: number } | null;
-    tools_used?: { tool_name: string; args: Record<string, any>; result: any }[] | null;
+    tools_used?:
+      | { tool_name: string; args: Record<string, any>; result: any }[]
+      | null;
   }> {
     const startTime = Date.now();
 
@@ -319,16 +320,21 @@ export class ChatbotsService extends BaseService<Chatbot> {
         }
       }
 
-      const { response: finalResponseText, files, cards, tokenUsage, toolsUsed } =
-        await this.chatOrchestrator.runChatTurn({
-          workspaceId,
-          chatbotId,
-          userId,
-          conversationId: chatDto.conversation_id,
-          userMessage: chatDto.message,
-          chatbot,
-          extractedImageContent,
-        });
+      const {
+        response: finalResponseText,
+        files,
+        cards,
+        tokenUsage,
+        toolsUsed,
+      } = await this.chatOrchestrator.runChatTurn({
+        workspaceId,
+        chatbotId,
+        userId,
+        conversationId: chatDto.conversation_id,
+        userMessage: chatDto.message,
+        chatbot,
+        extractedImageContent,
+      });
 
       // Lưu tin nhắn bot vào database (kèm token usage và tools đã dùng)
       const botMessage = this.messageRepo.create({
@@ -344,16 +350,16 @@ export class ChatbotsService extends BaseService<Chatbot> {
       // Save attachments if any
       const responseFiles = files || [];
       if (responseFiles.length > 0) {
-         // Note: We need MessageAttachment repo here, assuming it's cascaded or we inject it
-         // Since we added cascade: true to Message entity, we can just assign and save
-         savedBotMessage.attachments = responseFiles.map((f: any) => ({
-           type: f.type,
-           url: f.url,
-           filename: f.filename,
-           size: f.size,
-           mime_type: f.mime_type
-         })) as any;
-         await this.messageRepo.save(savedBotMessage);
+        // Note: We need MessageAttachment repo here, assuming it's cascaded or we inject it
+        // Since we added cascade: true to Message entity, we can just assign and save
+        savedBotMessage.attachments = responseFiles.map((f: any) => ({
+          type: f.type,
+          url: f.url,
+          filename: f.filename,
+          size: f.size,
+          mime_type: f.mime_type,
+        })) as any;
+        await this.messageRepo.save(savedBotMessage);
       }
 
       const processingTime = Date.now() - startTime;
@@ -501,5 +507,3 @@ export class ChatbotsService extends BaseService<Chatbot> {
     );
   }
 }
-
-

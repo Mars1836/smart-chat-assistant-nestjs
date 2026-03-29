@@ -6,7 +6,9 @@ import { Queue } from 'bullmq';
 export class FileCleanupProducer {
   private readonly logger = new Logger(FileCleanupProducer.name);
 
-  constructor(@InjectQueue('file-cleanup') private readonly cleanupQueue: Queue) {}
+  constructor(
+    @InjectQueue('file-cleanup') private readonly cleanupQueue: Queue,
+  ) {}
 
   /**
    * Schedule a file for deletion after a delay

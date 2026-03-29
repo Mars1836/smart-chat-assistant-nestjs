@@ -67,4 +67,3 @@ export function sanitizeToolAuthConfig(authConfig: any): any {
   }
   return cloned;
 }
-

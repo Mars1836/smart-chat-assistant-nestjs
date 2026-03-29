@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Knowledge } from './entities/knowledge.entity';
@@ -38,7 +42,10 @@ export class KnowledgeService {
     return knowledge;
   }
 
-  async findOneByWorkspace(workspaceId: string, id: string): Promise<Knowledge> {
+  async findOneByWorkspace(
+    workspaceId: string,
+    id: string,
+  ): Promise<Knowledge> {
     const knowledge = await this.knowledgeRepo
       .createQueryBuilder('knowledge')
       .leftJoinAndSelect('knowledge.documents', 'documents')
@@ -95,14 +102,16 @@ export class KnowledgeService {
 
     if (knowledge) {
       knowledge.document_count = knowledge.documents?.length || 0;
-      knowledge.total_chunks = knowledge.documents?.reduce(
-        (sum, doc) => sum + (doc.chunk_count || 0),
-        0,
-      ) || 0;
-      knowledge.total_size = knowledge.documents?.reduce(
-        (sum, doc) => sum + (Number(doc.size) || 0),
-        0,
-      ) || 0;
+      knowledge.total_chunks =
+        knowledge.documents?.reduce(
+          (sum, doc) => sum + (doc.chunk_count || 0),
+          0,
+        ) || 0;
+      knowledge.total_size =
+        knowledge.documents?.reduce(
+          (sum, doc) => sum + (Number(doc.size) || 0),
+          0,
+        ) || 0;
       await this.knowledgeRepo.save(knowledge);
     }
   }

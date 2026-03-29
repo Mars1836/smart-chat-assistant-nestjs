@@ -294,7 +294,8 @@ export class UsersService extends BaseService<User> {
       : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
     const groupBy = query.groupBy ?? 'day';
 
-    const trunc = groupBy === 'month' ? 'month' : groupBy === 'week' ? 'week' : 'day';
+    const trunc =
+      groupBy === 'month' ? 'month' : groupBy === 'week' ? 'week' : 'day';
     const qb = this.userRepository
       .createQueryBuilder('u')
       .select(`date_trunc('${trunc}', u.created_at)::date`, 'date')
@@ -308,7 +309,10 @@ export class UsersService extends BaseService<User> {
     const rows = await qb.getRawMany<{ date: Date; count: string }>();
 
     return rows.map((r) => ({
-      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+      date:
+        r.date instanceof Date
+          ? r.date.toISOString().slice(0, 10)
+          : String(r.date).slice(0, 10),
       count: parseInt(r.count, 10),
     }));
   }

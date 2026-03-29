@@ -77,7 +77,9 @@ export class WorkspacesService extends BaseService<Workspace> {
       });
 
       if (!ownerRole) {
-        throw new InternalServerErrorException('Owner role not found in system');
+        throw new InternalServerErrorException(
+          'Owner role not found in system',
+        );
       }
 
       const ownerMember = this.memberRepository.create({
@@ -131,13 +133,18 @@ export class WorkspacesService extends BaseService<Workspace> {
     // Query builder to get workspaces where user is owner OR member
     const queryBuilder = this.workspaceRepository
       .createQueryBuilder('workspace')
-      .leftJoin('workspace_members', 'member', 'member.workspace_id = workspace.id AND member.user_id = :userId AND member.is_active = true', { userId })
+      .leftJoin(
+        'workspace_members',
+        'member',
+        'member.workspace_id = workspace.id AND member.user_id = :userId AND member.is_active = true',
+        { userId },
+      )
       .leftJoin('workspace_roles', 'role', 'role.id = member.workspace_role_id')
       .select([
         'workspace',
         'member.id',
-        'member.workspace_role_id', 
-        'role.name'
+        'member.workspace_role_id',
+        'role.name',
       ])
       .where('workspace.owner_id = :userId', { userId })
       .orWhere('member.user_id = :userId', { userId })
@@ -292,5 +299,3 @@ export class WorkspacesService extends BaseService<Workspace> {
     };
   }
 }
-
-

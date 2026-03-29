@@ -7,7 +7,10 @@ import { WorkspaceTool } from './entities/workspace-tool.entity';
 import { UserToolCredential } from './entities/user-tool-credential.entity';
 import { CreateToolDto, CreateToolActionDto } from './dto/create-tool.dto';
 import { UpdateToolDto, UpdateToolActionDto } from './dto/update-tool.dto';
-import { maskApiKeyInConfigOverride, sanitizeToolAuthConfig } from './utils/secret-mask.util';
+import {
+  maskApiKeyInConfigOverride,
+  sanitizeToolAuthConfig,
+} from './utils/secret-mask.util';
 
 export interface ToolWithMeta extends Tool {
   workspace_tool?: {
@@ -102,7 +105,7 @@ export class ToolsService {
     });
 
     // Get user OAuth credentials if userId provided
-    let userCredMap = new Map<string, UserToolCredential>();
+    const userCredMap = new Map<string, UserToolCredential>();
     if (userId) {
       const credentials = await this.userCredentialRepo.find({
         where: { user_id: userId, workspace_id: workspaceId },
@@ -120,7 +123,9 @@ export class ToolsService {
         workspace_tool: wsMeta
           ? {
               is_enabled: wsMeta.is_enabled,
-              config_override: maskApiKeyInConfigOverride(wsMeta.config_override),
+              config_override: maskApiKeyInConfigOverride(
+                wsMeta.config_override,
+              ),
               added_by: wsMeta.added_by,
               created_at: wsMeta.created_at,
               updated_at: wsMeta.updated_at,
@@ -167,7 +172,7 @@ export class ToolsService {
     }
 
     // Get user OAuth credentials if userId provided
-    let userCredMap = new Map<string, UserToolCredential>();
+    const userCredMap = new Map<string, UserToolCredential>();
     if (userId) {
       const credentials = await this.userCredentialRepo.find({
         where: { user_id: userId, workspace_id: workspaceId },

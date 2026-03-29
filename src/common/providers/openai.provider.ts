@@ -16,7 +16,9 @@ export class OpenAIProvider implements ILLMProvider {
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY is not set. OpenAI features will not work.');
+      this.logger.warn(
+        'OPENAI_API_KEY is not set. OpenAI features will not work.',
+      );
     }
     this.client = new OpenAI({
       apiKey: apiKey,
@@ -80,7 +82,7 @@ export class OpenAIProvider implements ILLMProvider {
             });
           }
         } else if (msg.role === 'system') {
-           openAIMessages.push({ role: 'system', content: msg.content || '' });
+          openAIMessages.push({ role: 'system', content: msg.content || '' });
         } else {
           // User
           openAIMessages.push({ role: 'user', content: msg.content || '' });

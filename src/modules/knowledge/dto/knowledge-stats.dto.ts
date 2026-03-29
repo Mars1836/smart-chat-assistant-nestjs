@@ -31,4 +31,3 @@ export class KnowledgeStatsSummaryDto {
   })
   knowledge_last_30_days: number;
 }
-

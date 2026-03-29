@@ -37,4 +37,3 @@ import { WidgetSecurityService } from './widget-security.service';
   ],
 })
 export class WidgetModule {}
-

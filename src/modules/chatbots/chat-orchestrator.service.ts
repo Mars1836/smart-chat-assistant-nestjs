@@ -40,7 +40,10 @@ const ChatGraphState = Annotation.Root({
   systemInstruction: Annotation<string>,
 
   geminiMessages: Annotation<GeminiMessage[]>({
-    reducer: (left: GeminiMessage[], right: GeminiMessage | GeminiMessage[]) => {
+    reducer: (
+      left: GeminiMessage[],
+      right: GeminiMessage | GeminiMessage[],
+    ) => {
       if (Array.isArray(right)) return left.concat(right);
       return left.concat([right]);
     },
@@ -48,8 +51,10 @@ const ChatGraphState = Annotation.Root({
   }),
 
   functionCalls: Annotation<GeminiFunctionCall[] | null>({
-    reducer: (_left: GeminiFunctionCall[] | null, right: GeminiFunctionCall[] | null) =>
-      right,
+    reducer: (
+      _left: GeminiFunctionCall[] | null,
+      right: GeminiFunctionCall[] | null,
+    ) => right,
     default: () => null,
   }),
 
@@ -90,7 +95,8 @@ const ChatGraphState = Annotation.Root({
 
   /** Cards chung (product / article / link) từ tool để FE render card có ảnh + link */
   cards: Annotation<any[]>({
-    reducer: (_left: any[], right: any[]) => (Array.isArray(right) ? right : []),
+    reducer: (_left: any[], right: any[]) =>
+      Array.isArray(right) ? right : [],
     default: () => [],
   }),
 
@@ -105,9 +111,10 @@ const ChatGraphState = Annotation.Root({
   }),
 
   /** Danh sách tools đã gọi và kết quả (để lưu vào message). */
-  toolsUsedLog: Annotation<{ tool_name: string; args: Record<string, any>; result: any }[]>({
-    reducer: (left, right) =>
-      left.concat(Array.isArray(right) ? right : []),
+  toolsUsedLog: Annotation<
+    { tool_name: string; args: Record<string, any>; result: any }[]
+  >({
+    reducer: (left, right) => left.concat(Array.isArray(right) ? right : []),
     default: () => [],
   }),
 });
@@ -168,10 +175,8 @@ export class ChatOrchestratorService {
 
       const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
         role: msg.role as any,
-        content:
-          msg.content || (msg as any).parts?.[0]?.text,
-        functionCall:
-          msg.functionCall || (msg as any).parts?.[0]?.functionCall,
+        content: msg.content || (msg as any).parts?.[0]?.text,
+        functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
         functionResponse:
           msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
             ? {
@@ -267,10 +272,8 @@ export class ChatOrchestratorService {
 
       const messages: LLMMessage[] = state.geminiMessages.map((msg) => ({
         role: msg.role as any,
-        content:
-          msg.content || (msg as any).parts?.[0]?.text,
-        functionCall:
-          msg.functionCall || (msg as any).parts?.[0]?.functionCall,
+        content: msg.content || (msg as any).parts?.[0]?.text,
+        functionCall: msg.functionCall || (msg as any).parts?.[0]?.functionCall,
         functionResponse:
           msg.functionResponse || (msg as any).parts?.[0]?.functionResponse
             ? {
@@ -360,11 +363,19 @@ export class ChatOrchestratorService {
         };
 
         try {
-          return await this.toolExecutorService.execute(call.name, call.args, ctx);
+          return await this.toolExecutorService.execute(
+            call.name,
+            call.args,
+            ctx,
+          );
         } catch (err: any) {
           // Retry once (simple policy)
           try {
-            return await this.toolExecutorService.execute(call.name, call.args, ctx);
+            return await this.toolExecutorService.execute(
+              call.name,
+              call.args,
+              ctx,
+            );
           } catch (err2: any) {
             return {
               error: err2?.message ?? String(err2),
@@ -375,34 +386,35 @@ export class ChatOrchestratorService {
 
       // Execute in parallel for speed
       const results = await Promise.all(calls.map(execOne));
-      
+
       this.logger.log(`Tool results: ${JSON.stringify(results)}`);
 
       // Collect files from results
       const files: any[] = [];
       results.forEach((res) => {
         if (res && res.url && (res.filename || res.path)) {
-           this.logger.log(`Found file in result: ${JSON.stringify(res)}`);
-           // Helper to detect type
-           const isImage = (filename: string, mime?: string) => {
-             if (mime && mime.startsWith('image/')) return true;
-             if (filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename)) return true;
-             return false;
-           };
+          this.logger.log(`Found file in result: ${JSON.stringify(res)}`);
+          // Helper to detect type
+          const isImage = (filename: string, mime?: string) => {
+            if (mime && mime.startsWith('image/')) return true;
+            if (filename && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename))
+              return true;
+            return false;
+          };
 
-           const filename = res.filename || 'download';
-           const type = isImage(filename, res.mime_type) ? 'image' : 'file';
+          const filename = res.filename || 'download';
+          const type = isImage(filename, res.mime_type) ? 'image' : 'file';
 
-           files.push({
-             type,
-             url: res.url,
-             filename,
-             size: res.size,
-             mime_type: res.mime_type
-           });
+          files.push({
+            type,
+            url: res.url,
+            filename,
+            size: res.size,
+            mime_type: res.mime_type,
+          });
         }
       });
-      
+
       this.logger.log(`Extracted files state update: ${JSON.stringify(files)}`);
 
       const fnResponses: GeminiMessage[] = calls.map((call, idx) => ({
@@ -420,20 +432,32 @@ export class ChatOrchestratorService {
       }));
 
       // Card: 1) result.cards, 2) mapper theo tool name, 3) generic chỉ khi action có card_config (plugin đánh dấu)
-      const cardConfigByCall = new Map<string, { enabled?: boolean; list_path?: string; field_mapping?: Record<string, string> }>();
+      const cardConfigByCall = new Map<
+        string,
+        {
+          enabled?: boolean;
+          list_path?: string;
+          field_mapping?: Record<string, string>;
+        }
+      >();
       for (const call of calls) {
         const sep = call.name.indexOf('__');
         if (sep > 0 && sep < call.name.length - 1) {
           const toolName = call.name.slice(0, sep);
           const actionName = call.name.slice(sep + 2);
-          const config = await this.toolRegistryService.getCardConfig(toolName, actionName);
+          const config = await this.toolRegistryService.getCardConfig(
+            toolName,
+            actionName,
+          );
           if (config) cardConfigByCall.set(call.name, config);
         }
       }
       const cards = buildCardsFromToolResults(
         calls,
         results,
-        { shopFrontendUrl: this.configService?.get<string>('SHOP_FRONTEND_URL') },
+        {
+          shopFrontendUrl: this.configService?.get<string>('SHOP_FRONTEND_URL'),
+        },
         { cardConfigByCall },
       );
 
@@ -574,10 +598,10 @@ export class ChatOrchestratorService {
       'Hãy trả lời một cách ngắn gọn, rõ ràng và hữu ích. Nếu không chắc chắn, hãy thừa nhận và đề xuất cách khác.',
     );
     parts.push(
-     'Tuyệt đối không hỏi lại người dùng chỉ sử dụng thông tin đã có trong tin nhắn trước đó',
+      'Tuyệt đối không hỏi lại người dùng chỉ sử dụng thông tin đã có trong tin nhắn trước đó',
     );
     parts.push(
-      'HÃY TẬN DỤNG TỐI ĐA các công cụ (tools) đã được khai báo, chủ động sử dụng tất cả các tools phù hợp mà không cần hỏi lại người dùng. Sử dụng tool là điều được ưu tiên hơn trả lời chung chung hoặc yêu cầu người dùng lặp lại. '
+      'HÃY TẬN DỤNG TỐI ĐA các công cụ (tools) đã được khai báo, chủ động sử dụng tất cả các tools phù hợp mà không cần hỏi lại người dùng. Sử dụng tool là điều được ưu tiên hơn trả lời chung chung hoặc yêu cầu người dùng lặp lại. ',
     );
 
     // Hướng dẫn riêng cho trường hợp có ảnh đính kèm đã được OCR trước ở backend

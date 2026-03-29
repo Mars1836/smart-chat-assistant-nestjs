@@ -61,7 +61,9 @@ export class GeminiProvider implements ILLMProvider {
       if (config?.systemInstruction) {
         geminiMessages.push({
           role: 'user',
-          parts: [{ text: `[System Instructions]: ${config.systemInstruction}` }],
+          parts: [
+            { text: `[System Instructions]: ${config.systemInstruction}` },
+          ],
         });
         geminiMessages.push({
           role: 'model',
@@ -159,7 +161,9 @@ export class GeminiProvider implements ILLMProvider {
         .filter((p: any) => p.functionCall)
         .map((p: any) => p.functionCall);
 
-      const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
+      const textParts = parts
+        .filter((p: any) => p.text)
+        .map((p: any) => p.text);
       const text = textParts.length > 0 ? textParts.join('\n') : undefined;
 
       const usageMeta = (data as any).usageMetadata;
@@ -257,7 +261,9 @@ Provide the extracted content in a clear, organized format.`;
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Gemini Vision API error: ${response.status} - ${error}`);
+        throw new Error(
+          `Gemini Vision API error: ${response.status} - ${error}`,
+        );
       }
 
       const data = await response.json();
@@ -298,20 +304,19 @@ Format the description in a way that would be useful for text search and retriev
   }
 
   async listModels(): Promise<string[]> {
-      // const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
-      // if (!response.ok) {
-      //   throw new Error(`Failed to list models: ${response.status}`);
-      // }
-      // const data = (await response.json()) as { models?: Array<{ name: string }> };
-      const allowedModels = [
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-      ];
+    // const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
+    // if (!response.ok) {
+    //   throw new Error(`Failed to list models: ${response.status}`);
+    // }
+    // const data = (await response.json()) as { models?: Array<{ name: string }> };
+    const allowedModels = [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
 
-      return allowedModels;
-    }
-  
+    return allowedModels;
+  }
 }

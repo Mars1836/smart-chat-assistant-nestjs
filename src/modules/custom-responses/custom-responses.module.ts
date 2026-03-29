@@ -7,4 +7,3 @@ import { CustomResponse } from './entities/custom-response.entity';
   exports: [TypeOrmModule],
 })
 export class CustomResponsesModule {}
-

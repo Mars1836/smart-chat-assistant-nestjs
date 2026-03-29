@@ -152,7 +152,9 @@ export class DocumentStorageService {
     const normalized = fileRef.replace(/^gs:\/\//, '');
     const firstSlash = normalized.indexOf('/');
     if (firstSlash === -1) {
-      throw new InternalServerErrorException(`Invalid GCS file reference: ${fileRef}`);
+      throw new InternalServerErrorException(
+        `Invalid GCS file reference: ${fileRef}`,
+      );
     }
 
     return {
@@ -212,5 +214,3 @@ export class DocumentStorageService {
     }
   }
 }
-
-

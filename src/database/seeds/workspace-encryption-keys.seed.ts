@@ -62,7 +62,10 @@ async function ensureTransitKey(
       `Vault create key: ${res.status} response is not JSON. Check VAULT_ADDR (http vs https). Body: ${text.slice(0, 200)}`,
     );
   }
-  if (res.status === 400 && json.errors?.[0]?.toLowerCase().includes('already exist')) {
+  if (
+    res.status === 400 &&
+    json.errors?.[0]?.toLowerCase().includes('already exist')
+  ) {
     console.log(`  ↻ Transit key already exists: ${kekName}`);
     return;
   }
@@ -112,7 +115,9 @@ export async function seedWorkspaceEncryptionKeys(
   const kekName = process.env.VAULT_TRANSIT_KEK_NAME ?? 'content-kek';
 
   if (!vaultToken) {
-    console.warn('  ⚠ VAULT_TOKEN not set; skip workspace encryption keys seed.');
+    console.warn(
+      '  ⚠ VAULT_TOKEN not set; skip workspace encryption keys seed.',
+    );
     return;
   }
 
@@ -137,13 +142,19 @@ export async function seedWorkspaceEncryptionKeys(
     let skipped = 0;
 
     for (const ws of workspaces) {
-      const existing = await keyRepo.findOne({ where: { workspace_id: ws.id } });
+      const existing = await keyRepo.findOne({
+        where: { workspace_id: ws.id },
+      });
       if (existing) {
         skipped++;
         continue;
       }
 
-      const encryptedDek = await generateEncryptedDek(vaultAddr, vaultToken, kekName);
+      const encryptedDek = await generateEncryptedDek(
+        vaultAddr,
+        vaultToken,
+        kekName,
+      );
       await keyRepo.save(
         keyRepo.create({
           workspace_id: ws.id,

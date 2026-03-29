@@ -27,7 +27,10 @@ export class UploadedImageDto {
   @ApiProperty({ description: 'ID của attachment' })
   id: string;
 
-  @ApiProperty({ description: 'URL của ảnh', example: '/uploads/chat-images/workspace-id/image.jpg' })
+  @ApiProperty({
+    description: 'URL của ảnh',
+    example: '/uploads/chat-images/workspace-id/image.jpg',
+  })
   url: string;
 
   @ApiProperty({ description: 'Tên file', example: 'image.jpg' })
@@ -36,7 +39,10 @@ export class UploadedImageDto {
   @ApiPropertyOptional({ description: 'MIME type', example: 'image/jpeg' })
   mime_type?: string;
 
-  @ApiPropertyOptional({ description: 'Kích thước file (bytes)', example: 102400 })
+  @ApiPropertyOptional({
+    description: 'Kích thước file (bytes)',
+    example: 102400,
+  })
   size?: number;
 }
 
@@ -59,14 +65,23 @@ export class ChatResponseDto {
   })
   model: string;
 
-  @ApiProperty({ required: false, type: [Object], description: 'Files từ tools (bot response)' })
+  @ApiProperty({
+    required: false,
+    type: [Object],
+    description: 'Files từ tools (bot response)',
+  })
   files?: any[];
 
-  @ApiProperty({ required: false, type: [UploadedImageDto], description: 'Ảnh user đã upload' })
+  @ApiProperty({
+    required: false,
+    type: [UploadedImageDto],
+    description: 'Ảnh user đã upload',
+  })
   uploaded_images?: UploadedImageDto[];
 
   @ApiPropertyOptional({
-    description: 'Cards chung (product | article | link): title, description?, imageUrl?, url (link khi bấm), metadata? (giá, brand, author, ...). FE render một kiểu card cho mọi type.',
+    description:
+      'Cards chung (product | article | link): title, description?, imageUrl?, url (link khi bấm), metadata? (giá, brand, author, ...). FE render một kiểu card cho mọi type.',
     type: 'array',
     items: {
       type: 'object',
@@ -89,14 +104,20 @@ export class ChatResponseDto {
   processingTime: number;
 
   @ApiPropertyOptional({
-    description: 'Token usage của lượt chat (input + output). Có khi LLM trả về usage.',
+    description:
+      'Token usage của lượt chat (input + output). Có khi LLM trả về usage.',
     example: { input_tokens: 120, output_tokens: 45 },
   })
   token_usage?: { input_tokens: number; output_tokens: number } | null;
 
   @ApiPropertyOptional({
-    description: 'Tools đã gọi và kết quả trong lượt chat. Dùng để hiển thị Details.',
-    example: [{ tool_name: 'knowledge_search', args: { query: '...' }, result: {} }],
+    description:
+      'Tools đã gọi và kết quả trong lượt chat. Dùng để hiển thị Details.',
+    example: [
+      { tool_name: 'knowledge_search', args: { query: '...' }, result: {} },
+    ],
   })
-  tools_used?: { tool_name: string; args: Record<string, any>; result: any }[] | null;
+  tools_used?:
+    | { tool_name: string; args: Record<string, any>; result: any }[]
+    | null;
 }

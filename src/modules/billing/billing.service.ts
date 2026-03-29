@@ -171,10 +171,8 @@ export class BillingService {
       throw new Error('Amount must be greater than 0');
     }
 
-    const bankId =
-      this.configService.get<string>('VIETQR_BANK_ID') || 'VCB';
-    const accountNo =
-      this.configService.get<string>('VIETQR_ACCOUNT_NO') || '';
+    const bankId = this.configService.get<string>('VIETQR_BANK_ID') || 'VCB';
+    const accountNo = this.configService.get<string>('VIETQR_ACCOUNT_NO') || '';
     const accountName =
       this.configService.get<string>('VIETQR_ACCOUNT_NAME') || null;
     const baseUrl =
@@ -400,4 +398,3 @@ export class BillingService {
     return createPaginatedResult(data, total, page, limit);
   }
 }
-

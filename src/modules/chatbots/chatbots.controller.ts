@@ -118,7 +118,7 @@ export class ChatbotsController {
           totalPages: 5,
           hasNextPage: true,
           hasPreviousPage: false,
-          },
+        },
       },
     },
   })
@@ -226,15 +226,17 @@ export class ChatbotsController {
   }
 
   @Post(':id/chat')
-  @UseInterceptors(FilesInterceptor('images', 5, {
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per file
-    fileFilter: (req, file, cb) => {
-      if (!file.mimetype.startsWith('image/')) {
-        return cb(new Error('Only image files are allowed'), false);
-      }
-      cb(null, true);
-    },
-  }))
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max per file
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new Error('Only image files are allowed'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
   @ApiOperation({ summary: 'Chat với chatbot (hỗ trợ gửi ảnh)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -242,7 +244,11 @@ export class ChatbotsController {
       type: 'object',
       properties: {
         message: { type: 'string', description: 'Tin nhắn của user' },
-        conversation_id: { type: 'string', format: 'uuid', description: 'ID của conversation' },
+        conversation_id: {
+          type: 'string',
+          format: 'uuid',
+          description: 'ID của conversation',
+        },
         images: {
           type: 'array',
           items: { type: 'string', format: 'binary' },

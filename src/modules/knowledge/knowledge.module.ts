@@ -18,7 +18,11 @@ import { SystemAdminGuard } from '../users/guards/system-admin.guard';
     AuthModule,
     UsersModule,
   ],
-  controllers: [KnowledgeController, ChatbotKnowledgeController, KnowledgeAdminController],
+  controllers: [
+    KnowledgeController,
+    ChatbotKnowledgeController,
+    KnowledgeAdminController,
+  ],
   providers: [KnowledgeService, SystemAdminGuard],
   exports: [KnowledgeService],
 })

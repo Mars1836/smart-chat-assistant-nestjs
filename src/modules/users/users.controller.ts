@@ -179,10 +179,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 403, description: 'Chỉ admin mới được xem user khác' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(
-    @Param('id') id: string,
-    @User('sub') currentUserId?: string,
-  ) {
+  findOne(@Param('id') id: string, @User('sub') currentUserId?: string) {
     return this.usersService.findOne(id, currentUserId);
   }
 

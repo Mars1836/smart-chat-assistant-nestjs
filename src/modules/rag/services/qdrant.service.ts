@@ -12,7 +12,8 @@ export class QdrantService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get<string>('QDRANT_URL') ?? 'http://localhost:6333';
+    const url =
+      this.configService.get<string>('QDRANT_URL') ?? 'http://localhost:6333';
     const apiKey = this.configService.get<string>('QDRANT_API_KEY');
 
     this.client = new QdrantClient({
@@ -41,9 +42,13 @@ export class QdrantService implements OnModuleInit {
             distance: 'Cosine', // Cosine similarity for text embeddings
           },
         });
-        this.logger.log(`✅ Qdrant collection '${this.collectionName}' created`);
+        this.logger.log(
+          `✅ Qdrant collection '${this.collectionName}' created`,
+        );
       } else {
-        this.logger.log(`✅ Qdrant collection '${this.collectionName}' already exists`);
+        this.logger.log(
+          `✅ Qdrant collection '${this.collectionName}' already exists`,
+        );
       }
     } catch (error) {
       this.logger.error(`❌ Failed to ensure Qdrant collection:`, error);
@@ -83,7 +88,9 @@ export class QdrantService implements OnModuleInit {
     queryVector: number[],
     limit: number = 5,
     filter?: Record<string, any>,
-  ): Promise<Array<{ id: string; score: number; payload: Record<string, any> }>> {
+  ): Promise<
+    Array<{ id: string; score: number; payload: Record<string, any> }>
+  > {
     try {
       const result = await this.client.search(this.collectionName, {
         vector: queryVector,
