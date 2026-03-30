@@ -38,7 +38,10 @@ export class WidgetService {
     };
   }
 
-  async chat(chatbotId: string, dto: WidgetChatDto): Promise<{
+  async chat(
+    chatbotId: string,
+    dto: WidgetChatDto,
+  ): Promise<{
     response: string;
     conversation_id: string;
     files?: any[];

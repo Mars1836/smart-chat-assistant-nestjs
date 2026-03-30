@@ -72,6 +72,7 @@ export interface ActionExecutorConfig {
  */
 export class GenericApiExecutor extends BaseToolExecutor {
   private readonly logger = new Logger(GenericApiExecutor.name);
+  private static readonly DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
   constructor(
     config: Record<string, any>,
@@ -431,6 +432,12 @@ export class GenericApiExecutor extends BaseToolExecutor {
         // For reply, we need to fetch original message first
         return this.gmailEncodeReply(params, context);
 
+      case 'google_calendar_prepare_list_events':
+        return this.googleCalendarPrepareListEvents(params);
+
+      case 'google_calendar_prepare_create_event':
+        return this.googleCalendarPrepareCreateEvent(params);
+
       default:
         this.logger.warn(`Unknown pre-processor: ${processorName}`);
         return params;
@@ -533,6 +540,188 @@ export class GenericApiExecutor extends BaseToolExecutor {
         encoded_message: encodedMessage,
       },
     };
+  }
+
+  private googleCalendarPrepareListEvents(
+    params: Record<string, any>,
+  ): Record<string, any> {
+    if (params.timeMin && params.timeMax) {
+      return {
+        ...params,
+        maxResults: params.maxResults ?? 10,
+        orderBy: params.orderBy ?? 'startTime',
+      };
+    }
+
+    const timezone = params.timeZone || GenericApiExecutor.DEFAULT_TIMEZONE;
+    const now = this.getNowInTimeZone(timezone);
+    const requestedDate =
+      typeof params.date === 'string' && params.date.trim()
+        ? params.date.trim()
+        : null;
+
+    let startDate: string;
+    let endDate: string;
+
+    if (requestedDate) {
+      startDate = requestedDate;
+      endDate = requestedDate;
+    } else {
+      switch (params.relativeRange) {
+        case 'tomorrow': {
+          const target = this.addDays(now, 1);
+          startDate = this.formatDate(target);
+          endDate = this.formatDate(target);
+          break;
+        }
+        case 'this_week':
+        case 'next_7_days': {
+          startDate = this.formatDate(now);
+          endDate = this.formatDate(this.addDays(now, 6));
+          break;
+        }
+        case 'today':
+        default: {
+          startDate = this.formatDate(now);
+          endDate = this.formatDate(now);
+          break;
+        }
+      }
+    }
+
+    return {
+      ...params,
+      timeZone: timezone,
+      timeMin: this.toOffsetDateTime(startDate, '00:00:00', timezone),
+      timeMax: this.toOffsetDateTime(endDate, '23:59:59', timezone),
+      maxResults: params.maxResults ?? 10,
+      orderBy: params.orderBy ?? 'startTime',
+    };
+  }
+
+  private googleCalendarPrepareCreateEvent(
+    params: Record<string, any>,
+  ): Record<string, any> {
+    if (params.startDateTime && params.endDateTime) {
+      return {
+        ...params,
+        timeZone: params.timeZone || GenericApiExecutor.DEFAULT_TIMEZONE,
+      };
+    }
+
+    const timezone = params.timeZone || GenericApiExecutor.DEFAULT_TIMEZONE;
+    const now = this.getNowInTimeZone(timezone);
+    const explicitDate =
+      typeof params.date === 'string' && params.date.trim()
+        ? params.date.trim()
+        : null;
+    const startTime = this.normalizeClockTime(params.startTime);
+    const endTime = this.normalizeClockTime(params.endTime);
+    const durationMinutes = Number(params.durationMinutes || 60);
+
+    if (!startTime) {
+      throw new BadRequestException(
+        'Calendar create_event requires startTime or startDateTime.',
+      );
+    }
+
+    const eventDate =
+      explicitDate ||
+      (params.relativeDay === 'today'
+        ? this.formatDate(now)
+        : this.formatDate(this.addDays(now, 1)));
+
+    const safeEndTime =
+      endTime || this.addMinutesToClockTime(startTime, durationMinutes);
+
+    return {
+      ...params,
+      timeZone: timezone,
+      date: eventDate,
+      startDateTime: this.toOffsetDateTime(
+        eventDate,
+        `${startTime}:00`,
+        timezone,
+      ),
+      endDateTime: this.toOffsetDateTime(
+        eventDate,
+        `${safeEndTime}:00`,
+        timezone,
+      ),
+    };
+  }
+
+  private getNowInTimeZone(timezone: string): Date {
+    const localized = new Date().toLocaleString('en-CA', {
+      timeZone: timezone,
+      hour12: false,
+    });
+    return new Date(localized);
+  }
+
+  private addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private normalizeClockTime(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minute) ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      return null;
+    }
+
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+
+  private addMinutesToClockTime(time: string, minutes: number): string {
+    const [hour, minute] = time.split(':').map(Number);
+    const total = hour * 60 + minute + minutes;
+    const normalized = ((total % 1440) + 1440) % 1440;
+    const nextHour = Math.floor(normalized / 60);
+    const nextMinute = normalized % 60;
+    return `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
+  }
+
+  private toOffsetDateTime(
+    date: string,
+    time: string,
+    timezone: string,
+  ): string {
+    return `${date}T${time}${this.getTimeZoneOffset(timezone)}`;
+  }
+
+  private getTimeZoneOffset(timezone: string): string {
+    if (timezone === 'Asia/Ho_Chi_Minh') {
+      return '+07:00';
+    }
+
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset',
+    }).formatToParts(new Date());
+    const offset = parts.find((part) => part.type === 'timeZoneName')?.value;
+    const match = offset?.match(/GMT([+-]\d{2}:\d{2})/);
+    return match?.[1] ?? '+00:00';
   }
 
   /**

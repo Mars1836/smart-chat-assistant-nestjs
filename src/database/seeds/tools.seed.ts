@@ -302,19 +302,30 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
           name: 'list_events',
           display_name: 'List Events',
           description:
-            'List upcoming events from the user primary calendar within a given time range.',
+            'List events from the user primary calendar. Prefer natural ranges like today, tomorrow, this week, or a specific date instead of raw ISO timestamps.',
           parameters: {
             type: 'OBJECT',
             properties: {
+              relativeRange: {
+                type: 'string',
+                description:
+                  'Natural time range. Use values like today, tomorrow, this_week, next_7_days when the user speaks naturally.',
+                enum: ['today', 'tomorrow', 'this_week', 'next_7_days'],
+              },
+              date: {
+                type: 'string',
+                description:
+                  'Specific date in YYYY-MM-DD format if the user provides an exact calendar day.',
+              },
               timeMin: {
                 type: 'string',
                 description:
-                  'Start time in ISO 8601 format, e.g. 2026-03-29T00:00:00+07:00',
+                  'Optional explicit start time in ISO 8601 format. Use only when needed.',
               },
               timeMax: {
                 type: 'string',
                 description:
-                  'End time in ISO 8601 format, e.g. 2026-03-30T00:00:00+07:00',
+                  'Optional explicit end time in ISO 8601 format. Use only when needed.',
               },
               maxResults: {
                 type: 'number',
@@ -335,6 +346,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
           executor_config: {
             method: 'GET',
             endpoint: '/calendars/primary/events',
+            pre_process: 'google_calendar_prepare_list_events',
             params: {
               query: {
                 timeMin: '{{timeMin}}',
@@ -374,7 +386,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
           name: 'create_event',
           display_name: 'Create Event',
           description:
-            'Create a new event on the user primary Google Calendar.',
+            'Create a new event on the user primary Google Calendar. Prefer simple intent-aware fields like date, relativeDay, startTime, endTime, and durationMinutes instead of raw ISO datetime strings.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -390,26 +402,54 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
                 type: 'string',
                 description: 'Event location',
               },
+              relativeDay: {
+                type: 'string',
+                description:
+                  'Natural day reference when the user says today or tomorrow.',
+                enum: ['today', 'tomorrow'],
+              },
+              date: {
+                type: 'string',
+                description:
+                  'Specific event date in YYYY-MM-DD format when the user gives a concrete date.',
+              },
+              startTime: {
+                type: 'string',
+                description:
+                  'Event start time in HH:mm format, for example 09:00.',
+              },
+              endTime: {
+                type: 'string',
+                description:
+                  'Event end time in HH:mm format, for example 10:00.',
+              },
+              durationMinutes: {
+                type: 'number',
+                description:
+                  'Optional duration in minutes if endTime is not available.',
+              },
               startDateTime: {
                 type: 'string',
                 description:
-                  'Event start time in ISO 8601 format, e.g. 2026-03-29T09:00:00+07:00',
+                  'Optional explicit start time in ISO 8601 format. Use only when the natural fields are not enough.',
               },
               endDateTime: {
                 type: 'string',
                 description:
-                  'Event end time in ISO 8601 format, e.g. 2026-03-29T10:00:00+07:00',
+                  'Optional explicit end time in ISO 8601 format. Use only when the natural fields are not enough.',
               },
               timeZone: {
                 type: 'string',
-                description: 'Time zone, e.g. Asia/Ho_Chi_Minh',
+                description:
+                  'Time zone, e.g. Asia/Ho_Chi_Minh. Default is Asia/Ho_Chi_Minh.',
               },
             },
-            required: ['summary', 'startDateTime', 'endDateTime'],
+            required: ['summary'],
           },
           executor_config: {
             method: 'POST',
             endpoint: '/calendars/primary/events',
+            pre_process: 'google_calendar_prepare_create_event',
             params: {
               body: {
                 summary: '{{summary}}',
@@ -433,7 +473,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'delete_event',
           display_name: 'Delete Event',
-          description: 'Delete an event from the user primary Google Calendar.',
+          description:
+            'Delete an event from the user primary Google Calendar by event ID. If the user only describes the event naturally, the system should list events first, resolve the target event, then call this action.',
           parameters: {
             type: 'OBJECT',
             properties: {

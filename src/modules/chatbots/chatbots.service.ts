@@ -296,19 +296,17 @@ export class ChatbotsService extends BaseService<Chatbot> {
     }
 
     // Kiểm tra conversation tồn tại và thuộc chatbot này
-    const conversation = await this.conversationRepo.findOne({
-      where: { id: chatDto.conversation_id, chatbot_id: chatbotId },
-    });
-
-    if (!conversation) {
-      throw new NotFoundException(
-        'Conversation not found or does not belong to this chatbot',
-      );
-    }
+    const conversation = await this.resolveConversationForChat(
+      workspaceId,
+      chatbotId,
+      userId,
+      chatDto.conversation_id,
+    );
+    const activeConversationId = conversation.id;
 
     // Lưu tin nhắn user vào database
     const userMessage = this.messageRepo.create({
-      conversation: { id: chatDto.conversation_id } as Conversation,
+      conversation: { id: activeConversationId } as Conversation,
       sender_type: 'user',
       sender: { id: userId } as any,
       content: chatDto.message,
@@ -338,7 +336,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         const ctx = {
           workspaceId,
           userId,
-          sessionId: chatDto.conversation_id,
+          sessionId: activeConversationId,
           chatbotId,
         };
         const texts: string[] = [];
@@ -369,7 +367,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         workspaceId,
         chatbotId,
         userId,
-        conversationId: chatDto.conversation_id,
+        conversationId: activeConversationId,
         userMessage: chatDto.message,
         chatbot,
         extractedImageContent,
@@ -377,7 +375,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
 
       // Lưu tin nhắn bot vào database (kèm token usage và tools đã dùng)
       const botMessage = this.messageRepo.create({
-        conversation: { id: chatDto.conversation_id } as Conversation,
+        conversation: { id: activeConversationId } as Conversation,
         sender_type: 'bot',
         sender: null,
         content: finalResponseText,
@@ -408,7 +406,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       );
 
       return {
-        conversation_id: chatDto.conversation_id,
+        conversation_id: activeConversationId,
         response: finalResponseText,
         model: chatbot.llm_model,
         files: responseFiles,
@@ -427,7 +425,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
 
       // Lưu fallback response vào database
       const botMessage = this.messageRepo.create({
-        conversation: { id: chatDto.conversation_id } as Conversation,
+        conversation: { id: activeConversationId } as Conversation,
         sender_type: 'bot',
         sender: null,
         content: fallbackResponse,
@@ -435,7 +433,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       await this.messageRepo.save(botMessage);
 
       return {
-        conversation_id: chatDto.conversation_id,
+        conversation_id: activeConversationId,
         response: fallbackResponse,
         model: chatbot.llm_model,
         files: [],
@@ -446,6 +444,50 @@ export class ChatbotsService extends BaseService<Chatbot> {
         tools_used: null,
       };
     }
+  }
+
+  private async resolveConversationForChat(
+    workspaceId: string,
+    chatbotId: string,
+    userId: string,
+    requestedConversationId: string,
+  ): Promise<Conversation> {
+    const matchingConversation = await this.conversationRepo.findOne({
+      where: {
+        id: requestedConversationId,
+        workspace_id: workspaceId,
+        chatbot_id: chatbotId,
+        user_id: userId,
+      },
+    });
+
+    if (matchingConversation) {
+      return matchingConversation;
+    }
+
+    const existingConversation = await this.conversationRepo.findOne({
+      where: { id: requestedConversationId },
+    });
+
+    if (existingConversation) {
+      this.logger.warn(
+        `Conversation ${requestedConversationId} does not match current context. ` +
+          `Creating a new conversation for workspace=${workspaceId}, chatbot=${chatbotId}, user=${userId}.`,
+      );
+    } else {
+      this.logger.warn(
+        `Conversation ${requestedConversationId} not found. Creating a new conversation for workspace=${workspaceId}, chatbot=${chatbotId}, user=${userId}.`,
+      );
+    }
+
+    const newConversation = this.conversationRepo.create({
+      workspace_id: workspaceId,
+      user_id: userId,
+      chatbot_id: chatbotId,
+      started_at: new Date(),
+    });
+
+    return this.conversationRepo.save(newConversation);
   }
 
   /**
