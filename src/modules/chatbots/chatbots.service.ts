@@ -32,6 +32,7 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
 import { LlmModelService } from '../billing/llm-model.service';
+import { ChatEventsService } from './chat-events.service';
 
 @Injectable()
 export class ChatbotsService extends BaseService<Chatbot> {
@@ -55,6 +56,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly chatOrchestrator: ChatOrchestratorService,
     private readonly configService: ConfigService,
     private readonly llmModelService: LlmModelService,
+    private readonly chatEventsService: ChatEventsService,
   ) {
     super();
   }
@@ -304,6 +306,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
     );
     const activeConversationId = conversation.id;
 
+    this.chatEventsService.emit({
+      type: 'chat_started',
+      conversation_id: activeConversationId,
+      chatbot_id: chatbotId,
+      timestamp: new Date().toISOString(),
+      message: 'Chat request received',
+    });
+
     // Lưu tin nhắn user vào database
     const userMessage = this.messageRepo.create({
       conversation: { id: activeConversationId } as Conversation,
@@ -405,6 +415,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
         `Chat response generated in ${processingTime}ms for workspace ${workspaceId}`,
       );
 
+      this.chatEventsService.emit({
+        type: 'completed',
+        conversation_id: activeConversationId,
+        chatbot_id: chatbotId,
+        timestamp: new Date().toISOString(),
+        message: 'Final response generated',
+      });
+
       return {
         conversation_id: activeConversationId,
         response: finalResponseText,
@@ -418,6 +436,15 @@ export class ChatbotsService extends BaseService<Chatbot> {
       };
     } catch (error) {
       this.logger.error('Error in chat:', error);
+
+      this.chatEventsService.emit({
+        type: 'failed',
+        conversation_id: activeConversationId,
+        chatbot_id: chatbotId,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        message: 'Chat processing failed',
+      });
 
       const fallbackResponse =
         chatbot.fallback_message ??

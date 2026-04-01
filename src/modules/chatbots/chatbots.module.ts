@@ -17,6 +17,7 @@ import { ToolsModule } from '../tools/tools.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { BillingModule } from '../billing/billing.module';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
+import { ChatEventsService } from './chat-events.service';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
     OpenAIProvider,
     LLMFactoryService,
     ChatOrchestratorService,
+    ChatEventsService,
   ],
   exports: [TypeOrmModule, ChatbotsService],
 })

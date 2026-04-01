@@ -10,6 +10,8 @@ import {
   Query,
   UseInterceptors,
   UploadedFiles,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +25,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { Observable } from 'rxjs';
 import { ChatbotsService } from './chatbots.service';
 import {
   CreateChatbotDto,
@@ -42,13 +45,17 @@ import {
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { WORKSPACE_PERMISSIONS } from '../../common/constants/permissions.constant';
+import { ChatEventsService } from './chat-events.service';
 
 @ApiTags('chatbots')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/chatbots')
 export class ChatbotsController {
-  constructor(private readonly chatbotsService: ChatbotsService) {}
+  constructor(
+    private readonly chatbotsService: ChatbotsService,
+    private readonly chatEventsService: ChatEventsService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Tạo chatbot mới cho workspace' })
@@ -275,6 +282,19 @@ export class ChatbotsController {
     // Attach uploaded images to DTO
     chatDto.images = images || [];
     return this.chatbotsService.chat(workspaceId, id, userId, chatDto);
+  }
+
+  @Sse('conversations/:conversationId/stream')
+  @ApiOperation({ summary: 'Theo dõi tiến trình chat/tool runtime (SSE)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stream chat progress events',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_CHAT)
+  streamConversation(
+    @Param('conversationId') conversationId: string,
+  ): Observable<MessageEvent> {
+    return this.chatEventsService.getConversationStream(conversationId);
   }
 
   @Get('_/models')

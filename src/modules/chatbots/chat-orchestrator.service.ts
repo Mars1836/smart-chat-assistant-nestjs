@@ -14,6 +14,7 @@ import { LLMFactoryService } from '../../common/providers/llm-factory.service';
 import { LLMMessage } from '../../common/interfaces/llm-provider.interface';
 import { buildCardsFromToolResults } from './card-mappers';
 import { BillingService } from '../billing/billing.service';
+import { ChatEventsService } from './chat-events.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -291,6 +292,14 @@ export class ChatOrchestratorService {
     //   • Failure is non-fatal → falls back to single-step execution
     // ══════════════════════════════════════════════════════════════════════════
     .addNode('planner_step', async (state: typeof ChatGraphState.State) => {
+      this.chatEventsService.emit({
+        type: 'planning',
+        conversation_id: state.conversationId,
+        chatbot_id: state.chatbotId,
+        timestamp: new Date().toISOString(),
+        message: 'Planning tool execution',
+      });
+
       // Fast-path: nothing to plan without tools
       if (!state.tools?.length) {
         return { executionPlan: [], currentPlanStep: 0 };
@@ -400,6 +409,15 @@ export class ChatOrchestratorService {
     // • temperature:0 + maxTokens:512 → fast, deterministic.
     // ══════════════════════════════════════════════════════════════════════════
     .addNode('router_step', async (state: typeof ChatGraphState.State) => {
+      this.chatEventsService.emit({
+        type: 'routing',
+        conversation_id: state.conversationId,
+        chatbot_id: state.chatbotId,
+        timestamp: new Date().toISOString(),
+        step: state.currentPlanStep,
+        message: 'Selecting next action',
+      });
+
       const nextTurn = state.turn + 1;
       const provider = this.llmFactory.getProvider(state.chatbot.llm_model);
       const messages = this.toProviderMessages(state.geminiMessages);
@@ -485,6 +503,19 @@ export class ChatOrchestratorService {
         chatbotId: state.chatbotId,
       };
 
+      calls.forEach((call) => {
+        this.chatEventsService.emit({
+          type: 'tool_started',
+          conversation_id: state.conversationId,
+          chatbot_id: state.chatbotId,
+          timestamp: new Date().toISOString(),
+          tool_name: call.name,
+          args: call.args ?? {},
+          step: state.currentPlanStep,
+          message: `Executing ${call.name}`,
+        });
+      });
+
       // Parallel execution with one retry on failure
       const results = await Promise.all(
         calls.map(async (call) => {
@@ -511,6 +542,37 @@ export class ChatOrchestratorService {
       this.logger.log(
         `[execute_tools] step=${state.currentPlanStep} results=${JSON.stringify(results)}`,
       );
+
+      calls.forEach((call, index) => {
+        const result = results[index];
+
+        if (result?.error) {
+          this.chatEventsService.emit({
+            type: 'tool_failed',
+            conversation_id: state.conversationId,
+            chatbot_id: state.chatbotId,
+            timestamp: new Date().toISOString(),
+            tool_name: call.name,
+            args: call.args ?? {},
+            error: String(result.error),
+            step: state.currentPlanStep,
+            message: `${call.name} failed`,
+          });
+          return;
+        }
+
+        this.chatEventsService.emit({
+          type: 'tool_succeeded',
+          conversation_id: state.conversationId,
+          chatbot_id: state.chatbotId,
+          timestamp: new Date().toISOString(),
+          tool_name: call.name,
+          args: call.args ?? {},
+          result,
+          step: state.currentPlanStep,
+          message: `${call.name} completed`,
+        });
+      });
 
       // ── Collect files ──────────────────────────────────────────────────────
       const files: any[] = results
@@ -586,6 +648,14 @@ export class ChatOrchestratorService {
     // Full chatbot personality applied here. No tools passed → cannot loop back.
     // ══════════════════════════════════════════════════════════════════════════
     .addNode('answer_step', async (state: typeof ChatGraphState.State) => {
+      this.chatEventsService.emit({
+        type: 'assistant_responding',
+        conversation_id: state.conversationId,
+        chatbot_id: state.chatbotId,
+        timestamp: new Date().toISOString(),
+        message: 'Generating final answer',
+      });
+
       const nextTurn = state.turn + 1;
       const provider = this.llmFactory.getProvider(state.chatbot.llm_model);
       const messages = this.toProviderMessages(state.geminiMessages);
@@ -711,6 +781,7 @@ export class ChatOrchestratorService {
     private readonly toolExecutorService: ToolExecutorService,
     private readonly configService: ConfigService,
     private readonly billingService: BillingService,
+    private readonly chatEventsService: ChatEventsService,
   ) {}
 
   // ── Public API ─────────────────────────────────────────────────────────────
