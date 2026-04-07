@@ -25,9 +25,14 @@ async function bootstrap() {
       : true;
 
   app.enableCors({
+    // Keep global CORS policy for non-widget APIs.
+    // Widget public endpoints apply their own per-chatbot origin checks in controller/service.
     origin: corsOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    // Let OPTIONS continue to route handlers so widget endpoints can set CORS
+    // headers dynamically from chatbot widget config (allowed_origins, api key, ...).
+    preflightContinue: true,
     allowedHeaders: [
       'Content-Type',
       'Authorization',

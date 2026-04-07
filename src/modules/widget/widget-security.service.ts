@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +16,8 @@ import { RedisRateLimiterService } from '../../common/rate-limiter/redis-rate-li
 
 @Injectable()
 export class WidgetSecurityService {
+  private readonly logger = new Logger(WidgetSecurityService.name);
+
   constructor(
     @InjectRepository(Chatbot)
     private readonly chatbotRepo: Repository<Chatbot>,
@@ -47,6 +50,10 @@ export class WidgetSecurityService {
     const { origin, originHostname } = this.extractOrigin(req);
     const ip = this.extractIp(req);
     const apiKey = this.extractApiKey(req);
+
+    this.logger.debug(
+      `[widget-security] validateRequest chatbotId=${chatbotId} origin=${origin ?? 'null'} hostname=${originHostname ?? 'null'} ip=${ip ?? 'null'} hasApiKey=${apiKey ? 'yes' : 'no'} allowedOrigins=${JSON.stringify(widgetConfig.security.allowed_origins ?? [])}`,
+    );
 
     this.checkWhitelist(widgetConfig.security, origin, originHostname, ip);
     this.checkApiKey(widgetConfig.security, apiKey);
@@ -88,6 +95,10 @@ export class WidgetSecurityService {
     const { origin, originHostname } = this.extractOrigin(req);
     const ip = this.extractIp(req);
     const apiKey = this.extractApiKey(req);
+
+    this.logger.debug(
+      `[widget-security] validateAccess chatbotId=${chatbotId} origin=${origin ?? 'null'} hostname=${originHostname ?? 'null'} ip=${ip ?? 'null'} hasApiKey=${apiKey ? 'yes' : 'no'} allowedOrigins=${JSON.stringify(widgetConfig.security.allowed_origins ?? [])}`,
+    );
 
     this.checkWhitelist(widgetConfig.security, origin, originHostname, ip);
     this.checkApiKey(widgetConfig.security, apiKey);
@@ -202,11 +213,15 @@ export class WidgetSecurityService {
     ip: string | null,
   ) {
     if (!security.enabled) {
+      this.logger.warn('[widget-security] blocked: widget is disabled');
       throw new ForbiddenException('Widget is disabled');
     }
 
     if (security.allowed_origins && security.allowed_origins.length > 0) {
       if (!origin || !originHostname) {
+        this.logger.warn(
+          `[widget-security] blocked: missing origin/hostname. origin=${origin ?? 'null'} hostname=${originHostname ?? 'null'} allowedOrigins=${JSON.stringify(security.allowed_origins)}`,
+        );
         throw new ForbiddenException('Origin is not allowed');
       }
 
@@ -214,19 +229,34 @@ export class WidgetSecurityService {
         this.isAllowedOrigin(origin, originHostname, pattern),
       );
       if (!ok) {
+        this.logger.warn(
+          `[widget-security] blocked: origin not allowed. origin=${origin} hostname=${originHostname} allowedOrigins=${JSON.stringify(security.allowed_origins)}`,
+        );
         throw new ForbiddenException('Origin is not allowed');
       }
+
+      this.logger.debug(
+        `[widget-security] origin allowed. origin=${origin} hostname=${originHostname}`,
+      );
     }
 
     if (security.allowed_ips && security.allowed_ips.length > 0) {
       if (!ip) {
+        this.logger.warn(
+          `[widget-security] blocked: missing ip while whitelist enabled. allowedIps=${JSON.stringify(security.allowed_ips)}`,
+        );
         throw new ForbiddenException('IP is not allowed');
       }
 
       const ok = security.allowed_ips.some((allowedIp) => allowedIp === ip);
       if (!ok) {
+        this.logger.warn(
+          `[widget-security] blocked: ip not allowed. ip=${ip} allowedIps=${JSON.stringify(security.allowed_ips)}`,
+        );
         throw new ForbiddenException('IP is not allowed');
       }
+
+      this.logger.debug(`[widget-security] ip allowed. ip=${ip}`);
     }
   }
 
