@@ -15,21 +15,23 @@ import {
 
 export class ConversationStarterDto {
   @ApiProperty({
-    description: 'Nhãn ngắn hiển thị trên nút gợi ý',
+    description: 'Nhãn hiển thị trên nút gợi ý (có thể dài hơn cho tiếng Việt)',
     example: 'Giới thiệu',
+    maxLength: 200,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(80)
+  @IsString({ message: 'label phải là chuỗi' })
+  @IsNotEmpty({ message: 'label không được để trống' })
+  @MaxLength(200, { message: 'label không được vượt quá 200 ký tự' })
   label: string;
 
   @ApiProperty({
-    description: 'Nội dung sẽ được gửi khi người dùng click starter',
+    description: 'Nội dung gửi vào chat khi người dùng bấm nút',
     example: 'Hãy giới thiệu ngắn gọn bạn có thể hỗ trợ những gì.',
+    maxLength: 2000,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
+  @IsString({ message: 'message phải là chuỗi' })
+  @IsNotEmpty({ message: 'message không được để trống' })
+  @MaxLength(2000, { message: 'message không được vượt quá 2000 ký tự' })
   message: string;
 }
 

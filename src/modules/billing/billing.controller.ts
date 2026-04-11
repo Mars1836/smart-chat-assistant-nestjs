@@ -91,6 +91,11 @@ export class BillingController {
 
   @Sse('wallet/stream')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'SSE cập nhật số dư ví (realtime)',
+    description:
+      'EventSource không gửi header Authorization. Truyền JWT qua query: `?access_token=<jwt>` hoặc `?token=<jwt>`.',
+  })
   walletStream(
     @Param('workspaceId') workspaceId: string,
   ): Observable<MessageEvent> {

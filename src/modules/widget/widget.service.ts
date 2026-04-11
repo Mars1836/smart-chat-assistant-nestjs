@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { BillingService } from '../billing/billing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
@@ -23,6 +24,7 @@ export class WidgetService {
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
     private readonly widgetChatOrchestrator: WidgetChatOrchestratorService,
+    private readonly billingService: BillingService,
   ) {}
 
   getPublicConfig(
@@ -54,6 +56,10 @@ export class WidgetService {
     if (!chatbot || !chatbot.enabled) {
       throw new NotFoundException('Chatbot not found or disabled');
     }
+
+    await this.billingService.assertWalletHasCreditsForChat(
+      chatbot.workspace_id,
+    );
 
     // 1. Get or create conversation
     let conversation: Conversation;

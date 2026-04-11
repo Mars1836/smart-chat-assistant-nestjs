@@ -3,6 +3,7 @@ require('./common/utils/logger');
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { formatValidationErrors } from './common/utils/format-validation-errors';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -101,10 +102,12 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       exceptionFactory: (errors) => {
-        const messages = errors.map((error) => {
-          return `${error.property}: ${Object.values(error.constraints || {}).join(', ')}`;
+        const messages = formatValidationErrors(errors);
+        return new BadRequestException({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: messages.length ? messages : ['Validation failed'],
         });
-        return new BadRequestException(messages);
       },
     }),
   );

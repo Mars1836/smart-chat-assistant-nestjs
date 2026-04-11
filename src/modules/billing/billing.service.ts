@@ -1,4 +1,10 @@
-import { Injectable, Logger, MessageEvent } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  MessageEvent,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorkspaceWallet } from './entities/workspace-wallet.entity';
@@ -54,6 +60,22 @@ export class BillingService {
 
   async getBalance(workspaceId: string): Promise<WorkspaceWallet> {
     return this.getOrCreateWallet(workspaceId);
+  }
+
+  /**
+   * Chặn chat khi ví không còn credits (số dư ≤ 0 — gồm 0.00 và số âm).
+   * Gọi trước khi xử lý tin nhắn mới.
+   */
+  assertWalletHasCreditsForChat(workspaceId: string): Promise<void> {
+    return this.getOrCreateWallet(workspaceId).then((wallet) => {
+      const balance = Number(wallet.balance || '0');
+      if (balance <= 0) {
+        throw new HttpException(
+          'Số dư workspace không đủ credits. Vui lòng nạp thêm để tiếp tục chat.',
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+    });
   }
 
   getWalletStream(workspaceId: string): Observable<MessageEvent> {

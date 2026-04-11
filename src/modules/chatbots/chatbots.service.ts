@@ -32,6 +32,7 @@ import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
 import { LlmModelService } from '../billing/llm-model.service';
+import { BillingService } from '../billing/billing.service';
 import { ChatEventsService } from './chat-events.service';
 
 @Injectable()
@@ -56,6 +57,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly chatOrchestrator: ChatOrchestratorService,
     private readonly configService: ConfigService,
     private readonly llmModelService: LlmModelService,
+    private readonly billingService: BillingService,
     private readonly chatEventsService: ChatEventsService,
   ) {
     super();
@@ -296,6 +298,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
     if (!chatbot.enabled) {
       throw new ForbiddenException('Chatbot is disabled for this workspace');
     }
+
+    await this.billingService.assertWalletHasCreditsForChat(workspaceId);
 
     // Kiểm tra conversation tồn tại và thuộc chatbot này
     const conversation = await this.resolveConversationForChat(

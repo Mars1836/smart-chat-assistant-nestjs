@@ -13,7 +13,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
+    const token = this.extractToken(request);
 
     if (!token) {
       throw new UnauthorizedException('No token provided');
@@ -32,11 +32,25 @@ export class JwtAuthGuard implements CanActivate {
     return true;
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
+  /**
+   * Bearer header (API thường) hoặc `?access_token=` / `?token=` (SSE/EventSource không gửi được header).
+   */
+  private extractToken(request: Request): string | undefined {
     const authHeader = request.headers.authorization;
-    if (!authHeader) return undefined;
+    if (authHeader) {
+      const [type, token] = authHeader.split(' ');
+      if (type === 'Bearer' && token) return token;
+    }
 
-    const [type, token] = authHeader.split(' ');
-    return type === 'Bearer' ? token : undefined;
+    const q = request.query as Record<string, string | string[] | undefined>;
+    const fromQuery = q?.access_token ?? q?.token;
+    if (typeof fromQuery === 'string' && fromQuery.length > 0) {
+      return fromQuery;
+    }
+    if (Array.isArray(fromQuery) && fromQuery[0]) {
+      return fromQuery[0];
+    }
+
+    return undefined;
   }
 }
