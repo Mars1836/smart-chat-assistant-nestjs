@@ -10,8 +10,8 @@ import { AppService } from './app.service';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { swaggerConfig, swaggerOptions } from './swagger';
-import * as path from 'path';
 import cookieParser from 'cookie-parser';
+import type { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -23,6 +23,14 @@ async function bootstrap() {
     corsOriginsEnv && corsOriginsEnv.length > 0
       ? corsOriginsEnv.split(',').map((o) => o.trim())
       : true;
+
+  const allowedCorsHeaders = [
+    'Content-Type',
+    'Authorization',
+    'X-Client-Type',
+    'Accept',
+    'X-Widget-Key',
+  ].join(', ');
 
   app.enableCors({
     // Keep global CORS policy for non-widget APIs.
@@ -40,6 +48,50 @@ async function bootstrap() {
       'Accept',
       'X-Widget-Key',
     ],
+  });
+
+  // With preflightContinue: true, OPTIONS is not auto-answered — routes without @Options()
+  // (e.g. /auth/*, /workspaces, …) would 404 on preflight. Answer allowed-origin OPTIONS here.
+  // Skip /public/widget/* so WidgetController can set per-chatbot CORS on @Options handlers.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== 'OPTIONS') {
+      return next();
+    }
+    const p = req.path || '';
+    if (p.startsWith('/public/widget')) {
+      return next();
+    }
+    const requestOrigin = req.headers.origin;
+    let reflectOrigin: string | undefined;
+    if (Array.isArray(corsOrigin)) {
+      if (
+        typeof requestOrigin === 'string' &&
+        corsOrigin.includes(requestOrigin)
+      ) {
+        reflectOrigin = requestOrigin;
+      }
+    } else {
+      // origin: true in cors — mirror requesting origin for credentialed responses
+      reflectOrigin =
+        typeof requestOrigin === 'string' ? requestOrigin : undefined;
+    }
+    if (!reflectOrigin) {
+      return next();
+    }
+    const reqHdr = req.headers['access-control-request-headers'];
+    res.setHeader('Access-Control-Allow-Origin', reflectOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader(
+      'Access-Control-Allow-Methods',
+      'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    );
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      typeof reqHdr === 'string' && reqHdr.length > 0 ? reqHdr : allowedCorsHeaders,
+    );
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
   });
 
   // Enable validation globally
