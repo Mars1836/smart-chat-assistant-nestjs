@@ -110,7 +110,7 @@ export class ChatbotsController {
             confidence_threshold: 0.7,
             max_context_turns: 5,
             enable_learning: true,
-            llm_provider: 'google-ai-studio',
+            llm_provider: 'google-ai-studio (backend inferred from llm_model)',
             llm_model: 'gemini-2.0-flash-lite',
             temperature: 0.7,
             max_tokens: 1000,
@@ -306,6 +306,20 @@ export class ChatbotsController {
   })
   listModels() {
     return this.chatbotsService.listModelsNormalized();
+  }
+
+  @Get('_/models-selection')
+  @ApiOperation({
+    summary: 'Danh sách model dùng cho FE (kèm provider)',
+    description:
+      'Trả về đầy đủ provider/model/value/label để FE hiển thị dropdown và không cần tự suy luận provider.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of models with provider metadata',
+  })
+  listModelsForSelection() {
+    return this.chatbotsService.listModelsForSelection();
   }
 
   @Get('_/test')

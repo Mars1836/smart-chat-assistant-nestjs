@@ -16,7 +16,7 @@ export interface LLMTool_FunctionDeclaration {
   name: string;
   description: string;
   parameters?: {
-    type: 'OBJECT';
+    type: 'object' | 'OBJECT';
     properties: Record<string, any>;
     required?: string[];
   };

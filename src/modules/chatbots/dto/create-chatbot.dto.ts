@@ -129,15 +129,6 @@ export class CreateChatbotDto {
   enable_learning?: boolean;
 
   @ApiPropertyOptional({
-    description: 'LLM provider',
-    example: 'google-ai-studio',
-    default: 'google-ai-studio',
-  })
-  @IsString()
-  @IsOptional()
-  llm_provider?: string;
-
-  @ApiPropertyOptional({
     description: 'LLM model',
     example: 'gemini-2.0-flash-lite',
     default: 'gemini-2.0-flash-lite',

@@ -215,32 +215,58 @@ export class ToolRegistryService {
 
   /**
    * Normalize action.parameters into a JSON-schema-like object:
-   * { type: 'OBJECT', properties: {...}, required?: [...] }
+   * { type: 'object', properties: {...}, required?: [...] }
    */
   private normalizeParameters(parameters: any): {
-    type: 'OBJECT';
+    type: 'object';
     properties: Record<string, any>;
     required?: string[];
   } {
     if (!parameters) {
-      return { type: 'OBJECT', properties: {}, required: [] };
+      return { type: 'object', properties: {}, required: [] };
     }
 
     // If already schema-like
     if (parameters.type && parameters.properties) {
-      return {
-        type: 'OBJECT',
+      const base = {
+        type: 'object' as const,
         properties: parameters.properties ?? {},
         required: parameters.required ?? [],
       };
+      return this.normalizeJsonSchemaTypes(base);
     }
 
     // Legacy shape: { field: {type, description}, ... }
-    return {
-      type: 'OBJECT',
+    const base = {
+      type: 'object' as const,
       properties: parameters,
       required: [],
     };
+    return this.normalizeJsonSchemaTypes(base);
+  }
+
+  /**
+   * OpenAI yêu cầu JSON Schema type viết thường (object/string/number/...).
+   * Dữ liệu seed cũ có thể chứa chữ hoa (OBJECT/STRING/NUMBER), nên chuẩn hóa đệ quy.
+   */
+  private normalizeJsonSchemaTypes<T>(schema: T): T {
+    if (Array.isArray(schema)) {
+      return schema.map((item) => this.normalizeJsonSchemaTypes(item)) as T;
+    }
+
+    if (schema && typeof schema === 'object') {
+      const out: Record<string, any> = {};
+      for (const [key, value] of Object.entries(schema as Record<string, any>)) {
+        if (key === 'type' && typeof value === 'string') {
+          out[key] = value.toLowerCase();
+        } else {
+          out[key] = this.normalizeJsonSchemaTypes(value);
+        }
+      }
+      return out as T;
+    }
+
+    return schema;
   }
 
   /**
@@ -253,7 +279,7 @@ export class ToolRegistryService {
       description:
         'Search workspace knowledge bases using RAG. Use when you need factual information from uploaded documents or knowledge bases instead of guessing.',
       parameters: {
-        type: 'OBJECT',
+        type: 'object',
         properties: {
           query: {
             type: 'string',

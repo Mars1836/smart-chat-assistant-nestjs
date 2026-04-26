@@ -110,6 +110,24 @@ export class LlmModelService {
     });
   }
 
+  /**
+   * Tìm provider theo model từ bảng llm_models.
+   * Ưu tiên match theo các biến thể model (nguyên bản, bỏ prefix models/, bỏ provider:).
+   */
+  async findProviderByModel(model: string): Promise<string | null> {
+    const variants = this.modelLookupVariants(model);
+    for (const m of variants) {
+      const row = await this.repo.findOne({
+        where: { model: m },
+        order: { created_at: 'DESC' },
+      });
+      if (row?.provider) {
+        return row.provider;
+      }
+    }
+    return null;
+  }
+
   async findAll(query: PaginationDto): Promise<PaginatedResult<LlmModel>> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 10));

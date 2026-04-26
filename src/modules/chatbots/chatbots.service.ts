@@ -83,6 +83,21 @@ export class ChatbotsService extends BaseService<Chatbot> {
     return separatorIndex >= 0 ? model.slice(separatorIndex + 1) : model;
   }
 
+  /**
+   * Backend tự suy ra provider từ bảng llm_models theo llm_model.
+   * Fallback tối thiểu để tránh vỡ luồng khi model chưa có trong bảng giá.
+   */
+  private async resolveProviderFromModel(model: string): Promise<string> {
+    const providerFromDb = await this.llmModelService.findProviderByModel(model);
+    if (providerFromDb) return providerFromDb;
+
+    const raw = (model || '').toLowerCase();
+    if (raw.includes('gpt') || raw.includes('openai') || raw.includes('o1')) {
+      return 'openai';
+    }
+    return 'google-ai-studio';
+  }
+
   async listModelsForSelection(): Promise<
     { provider: string; model: string; value: string; label: string }[]
   > {
@@ -124,6 +139,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
     }
 
     // Tạo chatbot
+    const selectedModel = createDto.llm_model ?? 'gemini-2.0-flash-lite';
+    const inferredProvider = await this.resolveProviderFromModel(selectedModel);
+
     const chatbot = this.chatbotRepo.create({
       workspace_id: workspaceId,
       name: createDto.name,
@@ -139,8 +157,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
       confidence_threshold: createDto.confidence_threshold ?? 0.7,
       max_context_turns: createDto.max_context_turns ?? 5,
       enable_learning: createDto.enable_learning ?? true,
-      llm_provider: createDto.llm_provider ?? 'google-ai-studio',
-      llm_model: createDto.llm_model ?? 'gemini-2.0-flash-lite',
+      llm_provider: inferredProvider,
+      llm_model: selectedModel,
       temperature: createDto.temperature ?? 0.7,
       max_tokens: createDto.max_tokens ?? 1000,
       enabled: true,
@@ -201,6 +219,11 @@ export class ChatbotsService extends BaseService<Chatbot> {
     const chatbot = await this.findOne(workspaceId, chatbotId);
 
     Object.assign(chatbot, updateDto);
+    if (updateDto.llm_model !== undefined) {
+      chatbot.llm_provider = await this.resolveProviderFromModel(
+        updateDto.llm_model,
+      );
+    }
     if (
       updateDto.conversation_starters !== undefined &&
       !updateDto.conversation_starters.length
