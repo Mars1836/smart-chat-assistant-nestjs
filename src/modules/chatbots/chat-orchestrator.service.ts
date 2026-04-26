@@ -23,6 +23,7 @@ import { ChatEventsService } from './chat-events.service';
 type GeminiMessage = {
   role: 'user' | 'assistant' | 'function';
   content?: string;
+  images?: Array<{ mimeType: string; data: string }>;
   functionResponse?: { name: string; response: any };
   functionCall?: { name: string; args: any };
 };
@@ -212,9 +213,9 @@ const ChatGraphState = Annotation.Root({
     reducer: (_l: number, r: number) => r,
     default: () => 10,
   }),
-  extractedImageContent: Annotation<string>({
-    reducer: (_l: string, r: string) => r ?? '',
-    default: () => '',
+  imageInputs: Annotation<Array<{ mimeType: string; data: string }>>({
+    reducer: (_l, r) => r ?? [],
+    default: () => [],
   }),
 });
 
@@ -252,18 +253,18 @@ export class ChatOrchestratorService {
         content: m.content,
       }));
 
-      let currentUserContent = state.userMessage;
-      if (state.extractedImageContent?.trim()) {
-        currentUserContent +=
-          '\n\n[Content from attached image(s)]: ' +
-          state.extractedImageContent.trim();
-      }
+      const currentUserContent = state.userMessage;
 
       const last = mapped.at(-1);
       if (!last || last.role !== 'user' || last.content !== state.userMessage) {
-        mapped.push({ role: 'user', content: currentUserContent });
+        mapped.push({
+          role: 'user',
+          content: currentUserContent,
+          images: state.imageInputs,
+        });
       } else {
         mapped[mapped.length - 1].content = currentUserContent;
+        mapped[mapped.length - 1].images = state.imageInputs;
       }
 
       return {
@@ -793,7 +794,7 @@ export class ChatOrchestratorService {
     conversationId: string;
     userMessage: string;
     chatbot: Chatbot;
-    extractedImageContent?: string;
+    images?: Array<{ mimeType: string; data: string }>;
   }): Promise<{
     response: string;
     turns: number;
@@ -804,7 +805,7 @@ export class ChatOrchestratorService {
   }> {
     const result = await this.graph.invoke({
       ...params,
-      extractedImageContent: params.extractedImageContent ?? '',
+      imageInputs: params.images ?? [],
       systemInstruction: '',
       timeContext: '',
       geminiMessages: [],
@@ -852,6 +853,10 @@ export class ChatOrchestratorService {
       return {
         role: msg.role as any,
         content: msg.content ?? (msg as any).parts?.[0]?.text,
+        images: msg.images,
+        functionCall: msg.functionCall
+          ? { name: msg.functionCall.name, args: msg.functionCall.args }
+          : undefined,
         functionResponse: fnRes
           ? { name: fnRes.name, response: fnRes.response }
           : undefined,

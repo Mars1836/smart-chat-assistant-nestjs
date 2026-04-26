@@ -11,6 +11,10 @@ import {
 // Keep internal interfaces if needed for direct API mapping
 interface GeminiPart {
   text?: string;
+  inline_data?: {
+    mime_type: string;
+    data: string;
+  };
   functionCall?: { name: string; args: any };
   functionResponse?: { name: string; response: any };
 }
@@ -135,9 +139,20 @@ export class GeminiProvider implements ILLMProvider {
       }
 
       const text = (msg.content && String(msg.content).trim()) || ' ';
+      const parts: GeminiPart[] = [{ text }];
+
+      for (const image of msg.images ?? []) {
+        parts.push({
+          inline_data: {
+            mime_type: image.mimeType,
+            data: image.data,
+          },
+        });
+      }
+
       geminiMessages.push({
         role: 'user',
-        parts: [{ text }],
+        parts,
       });
     }
 

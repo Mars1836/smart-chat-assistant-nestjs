@@ -1,6 +1,10 @@
 export interface LLMMessage {
   role: 'user' | 'assistant' | 'function' | 'system';
   content?: string;
+  images?: Array<{
+    mimeType: string;
+    data: string;
+  }>;
   name?: string; // For function/tool responses
   functionCall?: {
     name: string;

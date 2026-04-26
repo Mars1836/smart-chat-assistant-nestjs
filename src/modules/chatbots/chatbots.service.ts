@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
@@ -26,7 +25,6 @@ import {
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagService } from '../rag/rag.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
-import { ToolExecutorService } from '../tools/tool-executor.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
@@ -53,9 +51,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly aiStudioService: GeminiProvider,
     private readonly ragService: RagService,
     private readonly toolRegistryService: ToolRegistryService,
-    private readonly toolExecutorService: ToolExecutorService,
     private readonly chatOrchestrator: ChatOrchestratorService,
-    private readonly configService: ConfigService,
     private readonly llmModelService: LlmModelService,
     private readonly billingService: BillingService,
     private readonly chatEventsService: ChatEventsService,
@@ -362,37 +358,11 @@ export class ChatbotsService extends BaseService<Chatbot> {
     }
 
     try {
-      let extractedImageContent: string | undefined;
-      if (uploadedImages.length > 0) {
-        const appUrl =
-          this.configService.get<string>('APP_URL') ?? 'http://localhost:4000';
-        const imageUrls = uploadedImages.map(
-          (att: { url: string }) =>
-            `${appUrl.replace(/\/$/, '')}${att.url.startsWith('/') ? att.url : '/' + att.url}`,
-        );
-        const ctx = {
-          workspaceId,
-          userId,
-          sessionId: activeConversationId,
-          chatbotId,
-        };
-        const texts: string[] = [];
-        for (const url of imageUrls) {
-          try {
-            const result = await this.toolExecutorService.execute(
-              'ocr',
-              { imageUrl: url },
-              ctx,
-            );
-            if (result?.text) texts.push(String(result.text).trim());
-          } catch (err) {
-            this.logger.warn(`OCR failed for image ${url}:`, err);
-          }
-        }
-        if (texts.length > 0) {
-          extractedImageContent = texts.join('\n\n---\n\n');
-        }
-      }
+      const imageInputs =
+        chatDto.images?.map((file) => ({
+          mimeType: file.mimetype,
+          data: file.buffer.toString('base64'),
+        })) ?? [];
 
       const {
         response: finalResponseText,
@@ -407,7 +377,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
         conversationId: activeConversationId,
         userMessage: chatDto.message,
         chatbot,
-        extractedImageContent,
+        images: imageInputs,
       });
 
       // Lưu tin nhắn bot vào database (kèm token usage và tools đã dùng)
