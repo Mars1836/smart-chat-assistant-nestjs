@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ export interface LlmModelPrices {
 
 @Injectable()
 export class LlmModelService {
+  private readonly logger = new Logger(LlmModelService.name);
+
   constructor(
     @InjectRepository(LlmModel)
     private readonly repo: Repository<LlmModel>,
@@ -27,18 +30,66 @@ export class LlmModelService {
   /**
    * Lấy giá per 1K input/output tokens theo provider + model.
    * Trả về { inputPer1K: 0, outputPer1K: 0 } nếu không tìm thấy.
+   *
+   * Chuẩn hoá: chatbot có thể lưu `llm_provider` = google-ai-studio trong khi bảng giá dùng `gemini`;
+   * model có thể có tiền tố `models/` (Gemini API). Thử nhiều cặp (provider, model) tương thích.
    */
   async getPrices(provider: string, model: string): Promise<LlmModelPrices> {
-    const row = await this.repo.findOne({
-      where: { provider, model },
-    });
-    if (!row) {
-      return { inputPer1K: 0, outputPer1K: 0 };
+    const providers = this.providerLookupCandidates(provider, model);
+    const models = this.modelLookupVariants(model);
+
+    for (const p of providers) {
+      for (const m of models) {
+        const row = await this.repo.findOne({
+          where: { provider: p, model: m },
+        });
+        if (row) {
+          const inputPer1K = Number(row.price_per_1k_input_tokens ?? 0);
+          const outputPer1K = Number(row.price_per_1k_output_tokens ?? 0);
+          this.logger.log(
+            `[getPrices] matched llm_models row id=${row.id} provider=${p} model=${m} inputPer1K=${inputPer1K} outputPer1K=${outputPer1K} (chatbot had provider="${provider}" model="${model}")`,
+          );
+          return { inputPer1K, outputPer1K };
+        }
+      }
     }
-    return {
-      inputPer1K: Number(row.price_per_1k_input_tokens ?? 0),
-      outputPer1K: Number(row.price_per_1k_output_tokens ?? 0),
-    };
+
+    this.logger.warn(
+      `[getPrices] NO llm_models row — credits will not decrease. Requested provider="${provider}" model="${model}" | tried providers=[${providers.join(', ')}] models=[${models.join(', ') || '(empty)'}]`,
+    );
+    return { inputPer1K: 0, outputPer1K: 0 };
+  }
+
+  /** Thứ tự: provider gốc → alias → suy luận từ tên model (gpt-* → openai, còn lại → gemini). */
+  private providerLookupCandidates(
+    provider: string,
+    model: string,
+  ): string[] {
+    const out: string[] = [];
+    const p = (provider || '').trim();
+    if (p) out.push(p);
+    if (p === 'google-ai-studio' || p === 'google') {
+      out.push('gemini');
+    }
+    const inferred = model?.startsWith('gpt-') ? 'openai' : 'gemini';
+    if (!out.includes(inferred)) out.push(inferred);
+    return [...new Set(out)];
+  }
+
+  /** Biến thể id model: nguyên bản, bỏ `models/`, bỏ prefix `provider:` nếu có. */
+  private modelLookupVariants(model: string): string[] {
+    const out: string[] = [];
+    if (!model) return out;
+    const trimmed = model.trim();
+    out.push(trimmed);
+    if (trimmed.startsWith('models/')) {
+      out.push(trimmed.slice('models/'.length));
+    }
+    const colon = trimmed.indexOf(':');
+    if (colon >= 0) {
+      out.push(trimmed.slice(colon + 1).trim());
+    }
+    return [...new Set(out)];
   }
 
   private readonly sortableColumns = [

@@ -409,6 +409,10 @@ export class WidgetChatOrchestratorService {
     const calls = state.functionCalls ?? [];
     if (calls.length === 0) return { functionCalls: null };
 
+    this.logger.log(
+      `[widget-chat] executing plugins conversationId=${state.conversationId} chatbotId=${state.chatbotId} count=${calls.length} tools=${calls.map((c) => c.name).join(', ')}`,
+    );
+
     const execOne = async (call: GeminiFunctionCall) => {
       const ctx = {
         workspaceId: state.workspaceId,

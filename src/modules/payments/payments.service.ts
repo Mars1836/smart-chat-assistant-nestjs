@@ -89,10 +89,17 @@ export class PaymentsService {
     filterUserId?: string,
   ): Promise<PaymentStatsSummaryDto> {
     const isAdmin = await this.usersService.isAdmin(currentUserId);
-    const userId = isAdmin && filterUserId ? filterUserId : currentUserId;
     if (!isAdmin && filterUserId) {
-      // User không được filter theo user khác
       throw new ForbiddenException('Forbidden');
+    }
+    // User thường: chỉ thống kê của mình. Admin + user_id: một user. Admin không user_id: toàn hệ thống (giống GET /payments).
+    let userId: string | undefined;
+    if (!isAdmin) {
+      userId = currentUserId;
+    } else if (filterUserId) {
+      userId = filterUserId;
+    } else {
+      userId = undefined;
     }
 
     const userWhere = userId ? 'p.user_id = :userId' : '1=1';
@@ -175,9 +182,16 @@ export class PaymentsService {
     currentUserId: string,
   ): Promise<PaymentStatsByDateItemDto[]> {
     const isAdmin = await this.usersService.isAdmin(currentUserId);
-    const userId = isAdmin && query.user_id ? query.user_id : currentUserId;
     if (!isAdmin && query.user_id) {
       throw new ForbiddenException('Forbidden');
+    }
+    let userId: string | undefined;
+    if (!isAdmin) {
+      userId = currentUserId;
+    } else if (query.user_id) {
+      userId = query.user_id;
+    } else {
+      userId = undefined;
     }
 
     const to = query.to ? new Date(query.to) : new Date();

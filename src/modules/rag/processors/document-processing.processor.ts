@@ -10,6 +10,7 @@ import { RagEventsService } from '../services/rag-events.service';
 import { GeminiProvider } from '../../../common/providers/gemini.provider';
 import { DocumentStorageService } from '../../../common/storage';
 import { WorkspaceEncryptionService } from '../../workspaces/workspace-encryption.service';
+import { KnowledgeService } from '../../knowledge/knowledge.service';
 
 @Processor('document-queue')
 export class DocumentProcessingProcessor extends WorkerHost {
@@ -24,6 +25,7 @@ export class DocumentProcessingProcessor extends WorkerHost {
     private readonly eventsService: RagEventsService,
     private readonly workspaceEncryptionService: WorkspaceEncryptionService,
     private readonly documentStorageService: DocumentStorageService,
+    private readonly knowledgeService: KnowledgeService,
   ) {
     super();
   }
@@ -97,6 +99,9 @@ export class DocumentProcessingProcessor extends WorkerHost {
       await this.documentRepo.update(documentId, {
         chunk_count: chunks.length,
       });
+      if (document.knowledge_id) {
+        await this.knowledgeService.updateStats(document.knowledge_id);
+      }
       await this.updateProgress(
         documentId,
         40,

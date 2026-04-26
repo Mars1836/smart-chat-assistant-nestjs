@@ -24,11 +24,48 @@ export class KnowledgeService {
   // KNOWLEDGE BASE CRUD
   // =====================
 
+  private async getKnowledgeAggregates(knowledgeId: string): Promise<{
+    document_count: number;
+    total_chunks: number;
+    total_size: number;
+  }> {
+    const raw = await this.knowledgeRepo
+      .createQueryBuilder('knowledge')
+      .leftJoin('knowledge.documents', 'documents')
+      .where('knowledge.id = :knowledgeId', { knowledgeId })
+      .select('COUNT(documents.id)', 'document_count')
+      .addSelect('COALESCE(SUM(documents.chunk_count), 0)', 'total_chunks')
+      .addSelect('COALESCE(SUM(documents.size), 0)', 'total_size')
+      .getRawOne<{
+        document_count: string;
+        total_chunks: string;
+        total_size: string;
+      }>();
+
+    return {
+      document_count: Number(raw?.document_count ?? 0),
+      total_chunks: Number(raw?.total_chunks ?? 0),
+      total_size: Number(raw?.total_size ?? 0),
+    };
+  }
+
+  private async hydrateKnowledgeStats(knowledge: Knowledge): Promise<Knowledge> {
+    const aggregates = await this.getKnowledgeAggregates(knowledge.id);
+    knowledge.document_count = aggregates.document_count;
+    knowledge.total_chunks = aggregates.total_chunks;
+    knowledge.total_size = aggregates.total_size;
+    return knowledge;
+  }
+
   async findAllByWorkspace(workspaceId: string): Promise<Knowledge[]> {
-    return this.knowledgeRepo.find({
+    const knowledges = await this.knowledgeRepo.find({
       where: { workspace_id: workspaceId },
       order: { created_at: 'DESC' },
     });
+
+    return Promise.all(
+      knowledges.map((knowledge) => this.hydrateKnowledgeStats(knowledge)),
+    );
   }
 
   async findOne(id: string): Promise<Knowledge> {
@@ -56,7 +93,7 @@ export class KnowledgeService {
     if (!knowledge) {
       throw new NotFoundException(`Knowledge base not found: ${id}`);
     }
-    return knowledge;
+    return this.hydrateKnowledgeStats(knowledge);
   }
 
   async create(
@@ -259,8 +296,9 @@ export class KnowledgeService {
       this.knowledgeRepo.count(),
       this.knowledgeRepo
         .createQueryBuilder('k')
-        .select('COALESCE(SUM(k.document_count), 0)', 'documents')
-        .addSelect('COALESCE(SUM(k.total_size), 0)', 'size')
+        .leftJoin('k.documents', 'documents')
+        .select('COUNT(documents.id)', 'documents')
+        .addSelect('COALESCE(SUM(documents.size), 0)', 'size')
         .getRawOne<{ documents: string; size: string }>(),
       this.knowledgeRepo
         .createQueryBuilder('k')

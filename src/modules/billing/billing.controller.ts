@@ -49,7 +49,7 @@ export class BillingController {
   @ApiOperation({
     summary: 'Lịch sử giao dịch ví / token (chỉ Owner & Admin workspace)',
     description:
-      'Giao dịch tiền (topup, refund, adjustment) và lịch sử dùng token (usage). Phân trang, lọc theo type.',
+      'Giao dịch tiền (topup, refund, adjustment) và usage. FE mapping: `amount` luôn là credits (+/-), `credit_amount` là bản sao chuẩn hóa theo credits, `token_amount` chỉ có ý nghĩa với usage (số token đã dùng, lưu âm).',
   })
   @ApiResponse({ status: 200, description: 'Paginated list of transactions' })
   @ApiResponse({

@@ -22,6 +22,12 @@ export interface LLMUsage {
   output_tokens: number;
 }
 
+type TransactionWithAmountBreakdown = WalletTransaction & {
+  token_amount: string | null;
+  credit_amount: string;
+  amount_unit: 'credits';
+};
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -111,7 +117,7 @@ export class BillingService {
 
   /**
    * Charge usage based on token counts.
-   * - amount trong giao dịch = số credits (token) đã dùng = totalTokens (lưu âm vì là trừ).
+   * - amount trong giao dịch usage = credits thực tế bị trừ (âm).
    * - Balance ví trừ theo giá per 1K input/output lấy từ bảng llm_models (provider+model).
    */
   async chargeUsage(
@@ -126,6 +132,7 @@ export class BillingService {
     const inputTokens = usage.input_tokens || 0;
     const outputTokens = usage.output_tokens || 0;
     const totalTokens = inputTokens + outputTokens;
+
     const prices = await this.llmModelService.getPrices(provider, model);
     const balanceDeduct =
       (inputTokens * prices.inputPer1K + outputTokens * prices.outputPer1K) /
@@ -140,18 +147,26 @@ export class BillingService {
       await this.walletRepo.save(wallet);
     }
 
-    // amount = số credits (token) đã sử dụng, lưu âm để thể hiện giao dịch trừ
+    // amount cho usage = credits trừ thực tế (âm)
+    // token_amount giữ lại trong metadata để FE vẫn hiển thị số token nếu cần
+    const tokenAmount = (-totalTokens).toFixed(4);
+    const creditAmount = (-balanceDeduct).toFixed(4);
     const tx = this.txRepo.create({
       workspace_id: workspaceId,
       user_id: userId ?? null,
       type: 'usage',
-      amount: (-totalTokens).toFixed(4),
+      amount: creditAmount,
       description: `LLM usage: provider=${provider}, model=${model}, tokens=${totalTokens}`,
       llm_provider: provider,
       llm_model: model,
       input_tokens: usage.input_tokens,
       output_tokens: usage.output_tokens,
-      metadata: metadata || null,
+      metadata: {
+        ...(metadata || {}),
+        token_amount: tokenAmount,
+        credit_amount: creditAmount,
+        amount_unit: 'credits',
+      },
     });
 
     await this.txRepo.save(tx);
@@ -394,7 +409,7 @@ export class BillingService {
       sortOrder?: 'ASC' | 'DESC';
       type?: 'topup' | 'usage' | 'refund' | 'adjustment';
     },
-  ): Promise<PaginatedResult<WalletTransaction>> {
+  ): Promise<PaginatedResult<TransactionWithAmountBreakdown>> {
     const page = Math.max(1, Number(options.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(options.limit) || 10));
     const skip = (page - 1) * limit;
@@ -417,6 +432,56 @@ export class BillingService {
     }
 
     const [data, total] = await qb.getManyAndCount();
-    return createPaginatedResult(data, total, page, limit);
+
+    const mapped = await Promise.all(
+      data.map(async (tx): Promise<TransactionWithAmountBreakdown> => {
+        const amountNum = Number(tx.amount || '0');
+
+        if (tx.type === 'usage') {
+          const tokenAmount =
+            tx.metadata?.token_amount != null
+              ? String(tx.metadata.token_amount)
+              : String(-((tx.input_tokens ?? 0) + (tx.output_tokens ?? 0)).toFixed(4));
+
+          let creditAmount: string | null =
+            tx.metadata?.credit_amount != null
+              ? String(tx.metadata.credit_amount)
+              : null;
+
+          // Fallback cho dữ liệu cũ chưa có credit_amount trong metadata
+          if (creditAmount == null && tx.llm_provider && tx.llm_model) {
+            const prices = await this.llmModelService.getPrices(
+              tx.llm_provider,
+              tx.llm_model,
+            );
+            const inputTokens = tx.input_tokens ?? 0;
+            const outputTokens = tx.output_tokens ?? 0;
+            const balanceDeduct =
+              (inputTokens * prices.inputPer1K +
+                outputTokens * prices.outputPer1K) /
+              1000;
+            creditAmount = (-balanceDeduct).toFixed(4);
+          }
+
+          // Chuẩn hóa response cho FE: amount luôn là credits
+          return {
+            ...tx,
+            amount: creditAmount ?? '0.0000',
+            token_amount: tokenAmount,
+            credit_amount: creditAmount ?? '0.0000',
+            amount_unit: 'credits',
+          };
+        }
+
+        return {
+          ...tx,
+          token_amount: null,
+          credit_amount: amountNum.toFixed(4),
+          amount_unit: 'credits',
+        };
+      }),
+    );
+
+    return createPaginatedResult(mapped, total, page, limit);
   }
 }

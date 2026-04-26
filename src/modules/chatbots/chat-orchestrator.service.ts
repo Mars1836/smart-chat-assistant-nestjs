@@ -874,7 +874,18 @@ export class ChatOrchestratorService {
     usage: any,
     phase: string,
   ): Promise<void> {
-    if (!usage || !state.workspaceId) return;
+    if (!state.workspaceId) {
+      this.logger.warn(
+        `[chargeUsage][${phase}] skipped: no workspaceId on state — billing will not run`,
+      );
+      return;
+    }
+    if (!usage) {
+      this.logger.warn(
+        `[chargeUsage][${phase}] skipped: LLM response has no usage (input/output tokens) — billing will not run`,
+      );
+      return;
+    }
     try {
       await this.billingService.chargeUsage(
         state.workspaceId,

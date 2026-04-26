@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -16,6 +17,8 @@ import { WidgetPublicConfigDto } from './dto/widget-public-config.dto';
 
 @Injectable()
 export class WidgetService {
+  private readonly logger = new Logger(WidgetService.name);
+
   constructor(
     @InjectRepository(Chatbot)
     private readonly chatbotRepo: Repository<Chatbot>,
@@ -104,6 +107,11 @@ export class WidgetService {
       userMessage: dto.message,
       chatbot: chatbot,
     });
+
+    const pluginNames = (result.toolsUsed ?? []).map((t) => t.tool_name);
+    this.logger.log(
+      `[widget-chat] completed chatbotId=${chatbot.id} conversationId=${conversation.id} plugin_calls=${pluginNames.length} tools=${JSON.stringify(pluginNames)}`,
+    );
 
     // 4. Save bot response (kèm token usage và tools đã dùng)
     const botMessage = this.messageRepo.create({

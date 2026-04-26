@@ -11,12 +11,14 @@ import { Document } from '../documents/entities/document.entity';
 import { RagService } from './rag.service';
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([DocumentVector, Document]),
     WorkspacesModule,
+    KnowledgeModule,
     BullModule.registerQueue({
       name: 'document-queue',
     }),
