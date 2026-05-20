@@ -214,7 +214,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
   ): Promise<Chatbot> {
     const chatbot = await this.findOne(workspaceId, chatbotId);
 
-    Object.assign(chatbot, updateDto);
+    const { llm_provider: _ignoredProvider, ...safeUpdateDto } = updateDto;
+    Object.assign(chatbot, safeUpdateDto);
     if (updateDto.llm_model !== undefined) {
       chatbot.llm_provider = await this.resolveProviderFromModel(
         updateDto.llm_model,

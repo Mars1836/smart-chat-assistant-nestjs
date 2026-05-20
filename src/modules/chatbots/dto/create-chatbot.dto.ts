@@ -129,6 +129,15 @@ export class CreateChatbotDto {
   enable_learning?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Deprecated. Backend ignores this value and infers provider from llm_model.',
+    example: 'openai',
+  })
+  @IsString()
+  @IsOptional()
+  llm_provider?: string;
+
+  @ApiPropertyOptional({
     description: 'LLM model',
     example: 'gemini-2.0-flash-lite',
     default: 'gemini-2.0-flash-lite',

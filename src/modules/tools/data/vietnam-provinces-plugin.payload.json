@@ -1,0 +1,285 @@
+{
+  "name": "vietnam_provinces",
+  "display_name": "Tra cứu đơn vị hành chính Việt Nam",
+  "description": "Tra cứu thông tin tỉnh/thành phố, quận/huyện và phường/xã tại Việt Nam từ Provinces Open API. Dùng khi người dùng hỏi mã tỉnh, danh sách tỉnh, quận huyện của một tỉnh, phường xã của một quận hoặc tìm kiếm địa danh hành chính.",
+  "category": "custom",
+  "is_enabled": true,
+  "executor_type": "generic_api",
+  "executor_config": {
+    "base_url": "https://provinces.open-api.vn/api/v1"
+  },
+  "auth_config": {
+    "type": "none"
+  },
+  "actions": [
+    {
+      "name": "list_all_divisions",
+      "display_name": "Lấy toàn bộ đơn vị hành chính",
+      "description": "Lấy danh sách đơn vị hành chính Việt Nam. Có thể chọn depth=1 để chỉ lấy tỉnh/thành, depth=2 để kèm quận/huyện, depth=3 để kèm cả phường/xã. Dùng khi người dùng muốn xem dữ liệu hành chính theo nhiều cấp.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "depth": {
+            "type": "number",
+            "description": "Mức dữ liệu cần lấy: 1 là tỉnh/thành, 2 là kèm quận/huyện, 3 là kèm phường/xã. Nếu không chắc, dùng 1 để tránh trả về quá nhiều dữ liệu."
+          }
+        },
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/",
+        "params": {
+          "query": {
+            "depth": "{{depth}}"
+          }
+        }
+      },
+      "sort_order": 0,
+      "is_enabled": true
+    },
+    {
+      "name": "list_provinces",
+      "display_name": "Danh sách tỉnh/thành phố",
+      "description": "Lấy danh sách tất cả tỉnh/thành phố của Việt Nam. Dùng khi người dùng hỏi Việt Nam có những tỉnh thành nào hoặc cần chọn tỉnh/thành.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/p/",
+        "params": {}
+      },
+      "sort_order": 1,
+      "is_enabled": true
+    },
+    {
+      "name": "search_provinces",
+      "display_name": "Tìm tỉnh/thành phố",
+      "description": "Tìm kiếm tỉnh/thành phố theo tên đầy đủ hoặc một phần tên, có thể dùng tiếng Việt có dấu hoặc không dấu. Dùng khi người dùng nhập tên tỉnh/thành nhưng chưa biết mã code.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Từ khóa tên tỉnh/thành phố cần tìm, ví dụ: Ha Noi, Hà Nội, ho chi minh, da nang."
+          }
+        },
+        "required": ["q"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/p/search/",
+        "params": {
+          "query": {
+            "q": "{{q}}"
+          }
+        }
+      },
+      "sort_order": 2,
+      "is_enabled": true
+    },
+    {
+      "name": "get_province",
+      "display_name": "Chi tiết tỉnh/thành phố",
+      "description": "Lấy thông tin chi tiết một tỉnh/thành phố theo mã code. Có thể thêm depth=2 để lấy quận/huyện hoặc depth=3 để lấy cả phường/xã. Dùng sau khi đã biết mã tỉnh/thành.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "code": {
+            "type": "number",
+            "description": "Mã code của tỉnh/thành phố, ví dụ Hà Nội là 1, TP. Hồ Chí Minh là 79."
+          },
+          "depth": {
+            "type": "number",
+            "description": "Mức dữ liệu cần lấy: 1 là chỉ tỉnh/thành, 2 là kèm quận/huyện, 3 là kèm phường/xã."
+          }
+        },
+        "required": ["code"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/p/{{code}}",
+        "params": {
+          "query": {
+            "depth": "{{depth}}"
+          }
+        }
+      },
+      "sort_order": 3,
+      "is_enabled": true
+    },
+    {
+      "name": "list_districts",
+      "display_name": "Danh sách quận/huyện",
+      "description": "Lấy danh sách tất cả quận/huyện/thị xã/thành phố thuộc tỉnh trong dữ liệu hành chính. Dùng khi người dùng muốn xem toàn bộ cấp quận/huyện.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/d/",
+        "params": {}
+      },
+      "sort_order": 4,
+      "is_enabled": true
+    },
+    {
+      "name": "search_districts",
+      "display_name": "Tìm quận/huyện",
+      "description": "Tìm kiếm quận/huyện theo tên. Có thể truyền thêm mã tỉnh để giới hạn kết quả trong một tỉnh/thành cụ thể. Dùng khi người dùng hỏi một quận/huyện thuộc tỉnh nào hoặc cần mã quận/huyện.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Từ khóa tên quận/huyện cần tìm, ví dụ: Ba Dinh, Bình Thạnh, Ninh Kiều."
+          },
+          "p": {
+            "type": "number",
+            "description": "Mã tỉnh/thành phố để lọc kết quả, ví dụ Hà Nội là 1, TP. Hồ Chí Minh là 79. Không bắt buộc."
+          }
+        },
+        "required": ["q"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/d/search/",
+        "params": {
+          "query": {
+            "q": "{{q}}",
+            "p": "{{p}}"
+          }
+        }
+      },
+      "sort_order": 5,
+      "is_enabled": true
+    },
+    {
+      "name": "get_district",
+      "display_name": "Chi tiết quận/huyện",
+      "description": "Lấy thông tin chi tiết một quận/huyện theo mã code. Có thể thêm depth=2 để lấy danh sách phường/xã thuộc quận/huyện đó.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "code": {
+            "type": "number",
+            "description": "Mã code của quận/huyện."
+          },
+          "depth": {
+            "type": "number",
+            "description": "Mức dữ liệu cần lấy: 1 là chỉ quận/huyện, 2 là kèm phường/xã."
+          }
+        },
+        "required": ["code"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/d/{{code}}",
+        "params": {
+          "query": {
+            "depth": "{{depth}}"
+          }
+        }
+      },
+      "sort_order": 6,
+      "is_enabled": true
+    },
+    {
+      "name": "list_wards",
+      "display_name": "Danh sách phường/xã",
+      "description": "Lấy danh sách tất cả phường/xã/thị trấn. Dùng khi người dùng muốn tra cứu dữ liệu cấp phường/xã trên toàn quốc. Kết quả có thể khá dài.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/w/",
+        "params": {}
+      },
+      "sort_order": 7,
+      "is_enabled": true
+    },
+    {
+      "name": "search_wards",
+      "display_name": "Tìm phường/xã",
+      "description": "Tìm kiếm phường/xã theo tên. Có thể truyền mã quận/huyện hoặc mã tỉnh/thành để lọc kết quả. Nếu có mã quận/huyện thì ưu tiên dùng mã quận/huyện.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Từ khóa tên phường/xã cần tìm, ví dụ: Phuc Xa, Bến Nghé, An Khánh."
+          },
+          "d": {
+            "type": "number",
+            "description": "Mã quận/huyện để lọc kết quả. Không bắt buộc."
+          },
+          "p": {
+            "type": "number",
+            "description": "Mã tỉnh/thành phố để lọc kết quả. Không bắt buộc và sẽ bị API bỏ qua nếu đã có mã quận/huyện."
+          }
+        },
+        "required": ["q"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/w/search/",
+        "params": {
+          "query": {
+            "q": "{{q}}",
+            "d": "{{d}}",
+            "p": "{{p}}"
+          }
+        }
+      },
+      "sort_order": 8,
+      "is_enabled": true
+    },
+    {
+      "name": "get_ward",
+      "display_name": "Chi tiết phường/xã",
+      "description": "Lấy thông tin chi tiết một phường/xã theo mã code. Dùng khi đã biết mã phường/xã và cần thông tin chính xác.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "code": {
+            "type": "number",
+            "description": "Mã code của phường/xã."
+          }
+        },
+        "required": ["code"]
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/w/{{code}}",
+        "params": {}
+      },
+      "sort_order": 9,
+      "is_enabled": true
+    },
+    {
+      "name": "get_data_version",
+      "display_name": "Phiên bản dữ liệu",
+      "description": "Lấy phiên bản dữ liệu hiện tại của Provinces Open API. Dùng khi người dùng hỏi dữ liệu hành chính đang ở phiên bản nào.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      },
+      "executor_config": {
+        "method": "GET",
+        "endpoint": "/version",
+        "params": {}
+      },
+      "sort_order": 10,
+      "is_enabled": true
+    }
+  ]
+}
