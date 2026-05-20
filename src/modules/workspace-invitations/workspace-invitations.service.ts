@@ -70,7 +70,7 @@ export class WorkspaceInvitationsService {
         where: { workspace_id: workspaceId, user_id: existingUser.id },
       });
 
-      if (existingMember) {
+      if (existingMember?.is_active) {
         throw new ConflictException(
           'User is already a member of this workspace',
         );
@@ -203,18 +203,20 @@ export class WorkspaceInvitationsService {
       },
     });
 
-    if (existingMember) {
+    if (existingMember?.is_active) {
       throw new ConflictException('User is already a member of this workspace');
     }
 
-    // Create workspace member
-    const member = this.memberRepo.create({
-      workspace_id: invitation.workspace_id,
-      user_id: userId,
-      workspace_role_id: invitation.workspace_role_id,
-      invited_by: invitation.invited_by,
-      is_active: true,
-    });
+    const member =
+      existingMember ??
+      this.memberRepo.create({
+        workspace_id: invitation.workspace_id,
+        user_id: userId,
+      });
+
+    member.workspace_role_id = invitation.workspace_role_id;
+    member.invited_by = invitation.invited_by;
+    member.is_active = true;
 
     await this.memberRepo.save(member);
 
