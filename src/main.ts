@@ -10,6 +10,7 @@ import { AppModule } from './app.module';
 import { AppService } from './app.service';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { HtmlSanitizationPipe } from './common/pipes/html-sanitization.pipe';
 import { swaggerConfig, swaggerOptions } from './swagger';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
@@ -97,6 +98,7 @@ async function bootstrap() {
 
   // Enable validation globally
   app.useGlobalPipes(
+    new HtmlSanitizationPipe(),
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
