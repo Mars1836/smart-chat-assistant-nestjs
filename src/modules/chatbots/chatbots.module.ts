@@ -17,10 +17,17 @@ import { ToolsModule } from '../tools/tools.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { BillingModule } from '../billing/billing.module';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
+import { ChatEventsService } from './chat-events.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Chatbot, Workspace, Conversation, Message, MessageAttachment]),
+    TypeOrmModule.forFeature([
+      Chatbot,
+      Workspace,
+      Conversation,
+      Message,
+      MessageAttachment,
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -45,6 +52,7 @@ import { ChatOrchestratorService } from './chat-orchestrator.service';
     OpenAIProvider,
     LLMFactoryService,
     ChatOrchestratorService,
+    ChatEventsService,
   ],
   exports: [TypeOrmModule, ChatbotsService],
 })

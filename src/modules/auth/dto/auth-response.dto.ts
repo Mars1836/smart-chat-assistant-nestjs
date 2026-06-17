@@ -9,11 +9,13 @@ export class AuthResponseDto {
   accessToken: string;
 
   @ApiProperty({
-    description: 'JWT refresh token (expires in 7 days)',
+    description:
+      'JWT refresh token (mobile only). Omitted for web when refresh is set as HttpOnly cookie.',
     example:
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE1MTYyMzkwMjJ9...',
+    required: false,
   })
-  refreshToken: string;
+  refreshToken?: string;
 
   @ApiProperty({
     description: 'User id (để FE lưu và chuyển trang theo system_role)',
@@ -34,7 +36,8 @@ export class AuthResponseDto {
   email: string;
 
   @ApiProperty({
-    description: 'Vai trò hệ thống: "admin" hoặc "user". null nếu chưa gán. FE dùng để chuyển trang (admin vs user).',
+    description:
+      'Vai trò hệ thống: "admin" hoặc "user". null nếu chưa gán. FE dùng để chuyển trang (admin vs user).',
     example: 'user',
     enum: ['admin', 'user'],
     nullable: true,
@@ -48,6 +51,13 @@ export class RefreshResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   accessToken: string;
+
+  @ApiProperty({
+    description:
+      'New refresh token after rotation (mobile only). Web receives rotated refresh via Set-Cookie.',
+    required: false,
+  })
+  refreshToken?: string;
 }
 
 export class ProfileResponseDto {
@@ -70,7 +80,8 @@ export class ProfileResponseDto {
   name: string;
 
   @ApiProperty({
-    description: 'Vai trò hệ thống: "admin" (quản trị viên) hoặc "user" (người dùng thường). null nếu chưa gán role.',
+    description:
+      'Vai trò hệ thống: "admin" (quản trị viên) hoặc "user" (người dùng thường). null nếu chưa gán role.',
     example: 'user',
     enum: ['admin', 'user'],
     nullable: true,

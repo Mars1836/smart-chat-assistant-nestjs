@@ -32,6 +32,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { WidgetModule } from './modules/widget/widget.module';
 import { StorageModule } from './common/storage';
+import { SpeechModule } from './modules/speech/speech.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { StorageModule } from './common/storage';
     KnowledgeModule,
     ToolsModule,
     WidgetModule,
+    SpeechModule,
     CustomResponsesModule,
     TrainingDataModule,
     // Chat Modules

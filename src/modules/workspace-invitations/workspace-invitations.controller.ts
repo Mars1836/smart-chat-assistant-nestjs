@@ -75,7 +75,8 @@ export class WorkspaceInvitationsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Chấp nhận lời mời vào workspace',
-    description: 'Sử dụng token từ email để chấp nhận lời mời và trở thành thành viên',
+    description:
+      'Sử dụng token từ email để chấp nhận lời mời và trở thành thành viên',
   })
   @ApiResponse({
     status: 201,
@@ -117,7 +118,8 @@ export class WorkspaceInvitationsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Gửi lại email mời (endpoint đơn giản)',
-    description: 'Tạo token mới và gửi lại email. Không cần workspaceId trong URL.',
+    description:
+      'Tạo token mới và gửi lại email. Không cần workspaceId trong URL.',
   })
   @ApiResponse({
     status: 200,

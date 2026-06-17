@@ -336,16 +336,16 @@ export class WorkspaceEncryptionService implements OnModuleInit {
    * Mã hóa nội dung bằng DEK của workspace.
    * Format: ENC1 (4 bytes) + IV (12) + ciphertext + authTag (16).
    */
-  async encryptContent(workspaceId: string, plaintext: Buffer): Promise<Buffer | null> {
+  async encryptContent(
+    workspaceId: string,
+    plaintext: Buffer,
+  ): Promise<Buffer | null> {
     const dek = await this.getPlaintextDek(workspaceId);
     if (!dek) return null;
 
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, dek, iv);
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext),
-      cipher.final(),
-    ]);
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
     const authTag = cipher.getAuthTag();
 
     return Buffer.concat([ENC_MAGIC, iv, encrypted, authTag]);
@@ -355,7 +355,10 @@ export class WorkspaceEncryptionService implements OnModuleInit {
    * Giải mã nội dung đã mã hóa.
    * Trả về null nếu không có DEK hoặc buffer không phải format ENC1.
    */
-  async decryptContent(workspaceId: string, data: Buffer): Promise<Buffer | null> {
+  async decryptContent(
+    workspaceId: string,
+    data: Buffer,
+  ): Promise<Buffer | null> {
     if (data.length < ENC_MAGIC.length + IV_LENGTH + AUTH_TAG_LENGTH) {
       return null;
     }
@@ -390,20 +393,29 @@ export class WorkspaceEncryptionService implements OnModuleInit {
   /**
    * Mã hóa chuỗi để lưu (Qdrant, DB). Trả về "ENC1:"+base64 hoặc null nếu không có DEK.
    */
-  async encryptString(workspaceId: string, plaintext: string): Promise<string | null> {
+  async encryptString(
+    workspaceId: string,
+    plaintext: string,
+  ): Promise<string | null> {
     const enc = await this.encryptContent(
       workspaceId,
       Buffer.from(plaintext, 'utf-8'),
     );
     if (!enc) return null;
-    return WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX + enc.toString('base64');
+    return (
+      WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX +
+      enc.toString('base64')
+    );
   }
 
   /**
    * Giải mã chuỗi đã lưu. Nếu chưa mã hóa (không có prefix ENC1:) thì trả về as-is.
    * Nếu mã hóa nhưng không giải được (Vault/DEK lỗi) thì trả về null.
    */
-  async decryptString(workspaceId: string, stored: string): Promise<string | null> {
+  async decryptString(
+    workspaceId: string,
+    stored: string,
+  ): Promise<string | null> {
     const prefix = WorkspaceEncryptionService.ENCRYPTED_CONTENT_PREFIX;
     if (!stored.startsWith(prefix)) {
       return stored; // Chưa mã hóa → dùng nguyên bản

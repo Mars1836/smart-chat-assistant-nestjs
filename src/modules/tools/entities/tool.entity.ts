@@ -27,7 +27,13 @@ export class Tool extends BaseEntity {
   // 'generic_api' is the new unified type for all API calls (REST, OAuth, etc.)
   // 'http_api' and 'oauth_api' kept for backwards compatibility
   @Column({ type: 'varchar', length: 50 })
-  executor_type: 'generic_api' | 'http_api' | 'function' | 'rag' | 'oauth_api' | 'database';
+  executor_type:
+    | 'generic_api'
+    | 'http_api'
+    | 'function'
+    | 'rag'
+    | 'oauth_api'
+    | 'database';
 
   // Default execution config (can be overridden at action level)
   @Column({ type: 'jsonb', default: {} })

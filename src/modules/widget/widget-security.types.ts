@@ -14,4 +14,3 @@ export interface ChatbotWidgetConfig {
   ui?: Record<string, any> | null;
   security: ChatbotWidgetSecurityConfig;
 }
-

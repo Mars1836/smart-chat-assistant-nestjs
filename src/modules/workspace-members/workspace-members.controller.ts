@@ -6,6 +6,9 @@ import {
   Param,
   UseGuards,
   Patch,
+  Delete,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -151,6 +154,38 @@ export class WorkspaceMembersController {
       memberId,
       requesterId,
       updateDto.role_name,
+    );
+  }
+
+  @Delete(':memberId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Xoa thanh vien khoi workspace',
+    description:
+      'Soft delete thanh vien khoi workspace bang cach set is_active=false. Khong the xoa chinh minh, Owner, hoac Admin khac neu nguoi thuc hien la Admin.',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Member removed successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Cannot remove this member',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Member not found',
+  })
+  @RequirePermissions(WORKSPACE_PERMISSIONS.MEMBER_REMOVE)
+  async removeMember(
+    @Param('workspaceId') workspaceId: string,
+    @Param('memberId') memberId: string,
+    @User('sub') requesterId: string,
+  ): Promise<void> {
+    await this.workspaceMembersService.removeMember(
+      workspaceId,
+      memberId,
+      requesterId,
     );
   }
 }

@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -78,11 +75,12 @@ export class DocumentsService extends BaseService<Document> {
       let uploadPath = sourcePath;
       try {
         encryptedTempPath = `${sourcePath}.enc`;
-        const encrypted = await this.workspaceEncryptionService.encryptFileToPath(
-          workspaceId,
-          sourcePath,
-          encryptedTempPath,
-        );
+        const encrypted =
+          await this.workspaceEncryptionService.encryptFileToPath(
+            workspaceId,
+            sourcePath,
+            encryptedTempPath,
+          );
         if (encrypted) {
           uploadPath = encryptedTempPath;
         }
@@ -126,11 +124,7 @@ export class DocumentsService extends BaseService<Document> {
     await this.knowledgeService.updateStats(createDto.knowledge_id);
 
     // Trigger RAG Indexing (Async)
-    await this.ragService.indexDocument(
-      savedDoc.id,
-      fileType,
-      userId,
-    );
+    await this.ragService.indexDocument(savedDoc.id, fileType, userId);
 
     return savedDoc;
   }
@@ -271,7 +265,7 @@ export class DocumentsService extends BaseService<Document> {
     userId: string,
   ): Promise<string> {
     const document = await this.findOne(workspaceId, documentId, userId);
-    
+
     // Check permission handled by findOne (and controller guard)
 
     const payload = {
@@ -334,7 +328,9 @@ export class DocumentsService extends BaseService<Document> {
 
     let buffer: Buffer;
     try {
-      buffer = await this.documentStorageService.readDocument(document.file_url);
+      buffer = await this.documentStorageService.readDocument(
+        document.file_url,
+      );
     } catch {
       throw new NotFoundException('File not found on server');
     }
@@ -386,6 +382,3 @@ export class DocumentsService extends BaseService<Document> {
     return map[type.toLowerCase()] || 'application/octet-stream';
   }
 }
-
-
-

@@ -22,7 +22,12 @@ export function getCardsFromResult(result: any): ChatCard[] | null {
 }
 
 function isValidCard(c: any): c is ChatCard {
-  return c && typeof c.type === 'string' && typeof c.title === 'string' && typeof c.url === 'string';
+  return (
+    c &&
+    typeof c.type === 'string' &&
+    typeof c.title === 'string' &&
+    typeof c.url === 'string'
+  );
 }
 
 /**
@@ -39,9 +44,10 @@ export function mapProductListToCards(
     title: p.name || p.title || 'Sản phẩm',
     description: p.description || undefined,
     imageUrl: Array.isArray(p.images) ? p.images[0] : p.images,
-    url: base && p.slug
-      ? `${base.replace(/\/$/, '')}/product.html?slug=${p.slug}`
-      : (p.url || (p.slug ? `product.html?slug=${p.slug}` : '#')),
+    url:
+      base && p.slug
+        ? `${base.replace(/\/$/, '')}/product.html?slug=${p.slug}`
+        : p.url || (p.slug ? `product.html?slug=${p.slug}` : '#'),
     metadata: {
       id: p.id,
       slug: p.slug,
@@ -78,7 +84,12 @@ export function mapArticleListToCards(items: any[]): ChatCard[] {
     type: 'article' as const,
     title: item.title || item.name || 'Bài viết',
     description: item.description || item.excerpt || item.snippet || undefined,
-    imageUrl: item.imageUrl || item.image_url || item.thumbnail || item.cover || undefined,
+    imageUrl:
+      item.imageUrl ||
+      item.image_url ||
+      item.thumbnail ||
+      item.cover ||
+      undefined,
     url: item.url || item.link || item.href || '#',
     metadata: {
       author: item.author,
@@ -91,17 +102,33 @@ export function mapArticleListToCards(items: any[]): ChatCard[] {
 /** Các key thường gặp để lấy title / url / image / description (tool khách hàng có thể trả về khác tên) */
 const TITLE_KEYS = ['title', 'name', 'heading', 'label'];
 const URL_KEYS = ['url', 'link', 'href', 'detailUrl', 'permalink'];
-const IMAGE_KEYS = ['imageUrl', 'image', 'thumbnail', 'cover', 'thumb', 'avatar'];
+const IMAGE_KEYS = [
+  'imageUrl',
+  'image',
+  'thumbnail',
+  'cover',
+  'thumb',
+  'avatar',
+];
 const DESC_KEYS = ['description', 'snippet', 'excerpt', 'summary', 'content'];
 
-function pickFirst(obj: any, keys: string[], fieldMapping?: Record<string, string>): string | undefined {
+function pickFirst(
+  obj: any,
+  keys: string[],
+  fieldMapping?: Record<string, string>,
+): string | undefined {
   if (!obj || typeof obj !== 'object') return undefined;
-  const toTry = fieldMapping ? keys.map((k) => fieldMapping[k] ?? k).filter(Boolean) : keys;
+  const toTry = fieldMapping
+    ? keys.map((k) => fieldMapping[k] ?? k).filter(Boolean)
+    : keys;
   for (const k of toTry) {
     const v = obj[k];
     if (v != null && typeof v === 'string' && v.trim() !== '') return v.trim();
   }
-  if ((fieldMapping?.imageUrl ?? 'image') === 'image' || keys.includes('image')) {
+  if (
+    (fieldMapping?.imageUrl ?? 'image') === 'image' ||
+    keys.includes('image')
+  ) {
     const arr = obj.images ?? obj.image_list;
     if (Array.isArray(arr) && arr[0]) {
       const v = arr[0];
@@ -112,9 +139,23 @@ function pickFirst(obj: any, keys: string[], fieldMapping?: Record<string, strin
 }
 
 function inferCardType(item: any): ChatCard['type'] {
-  if (item.type === 'product' || item.type === 'article' || item.type === 'link') return item.type;
-  if (item.slug != null || (typeof item.price === 'number' && !Number.isNaN(item.price))) return 'product';
-  if (item.author != null || item.publishedAt != null || item.published_at != null) return 'article';
+  if (
+    item.type === 'product' ||
+    item.type === 'article' ||
+    item.type === 'link'
+  )
+    return item.type;
+  if (
+    item.slug != null ||
+    (typeof item.price === 'number' && !Number.isNaN(item.price))
+  )
+    return 'product';
+  if (
+    item.author != null ||
+    item.publishedAt != null ||
+    item.published_at != null
+  )
+    return 'article';
   return 'link';
 }
 

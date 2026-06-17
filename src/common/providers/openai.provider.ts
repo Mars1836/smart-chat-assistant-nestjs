@@ -16,7 +16,9 @@ export class OpenAIProvider implements ILLMProvider {
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY is not set. OpenAI features will not work.');
+      this.logger.warn(
+        'OPENAI_API_KEY is not set. OpenAI features will not work.',
+      );
     }
     this.client = new OpenAI({
       apiKey: apiKey,
@@ -51,27 +53,24 @@ export class OpenAIProvider implements ILLMProvider {
       // 2. Map messages
       for (const msg of messages) {
         if (msg.role === 'function') {
-          // OpenAI expects tool outputs with role 'tool'
+          // These are historical tool results from the orchestrator graph.
+          // Send them as normal context; OpenAI's role=tool is only valid
+          // immediately after an assistant message with matching tool_calls.
           openAIMessages.push({
-            role: 'tool',
-            tool_call_id: msg.name || 'unknown_call_id', // Orchestrator might need to store call_id
-            content: JSON.stringify(msg.functionResponse?.response),
-          } as any);
+            role: 'user',
+            content: [
+              `[Tool result: ${msg.functionResponse?.name ?? msg.name ?? 'unknown'}]`,
+              JSON.stringify(msg.functionResponse?.response ?? null),
+            ].join('\n'),
+          });
         } else if (msg.role === 'assistant') {
           if (msg.functionCall) {
             openAIMessages.push({
               role: 'assistant',
-              content: null,
-              tool_calls: [
-                {
-                  id: 'call_' + msg.functionCall.name + '_' + Date.now(), // Fake ID if not stored
-                  type: 'function',
-                  function: {
-                    name: msg.functionCall.name,
-                    arguments: JSON.stringify(msg.functionCall.args),
-                  },
-                },
-              ],
+              content: [
+                `[Tool call requested: ${msg.functionCall.name}]`,
+                JSON.stringify(msg.functionCall.args ?? {}),
+              ].join('\n'),
             });
           } else {
             openAIMessages.push({
@@ -80,10 +79,24 @@ export class OpenAIProvider implements ILLMProvider {
             });
           }
         } else if (msg.role === 'system') {
-           openAIMessages.push({ role: 'system', content: msg.content || '' });
+          openAIMessages.push({ role: 'system', content: msg.content || '' });
         } else {
-          // User
-          openAIMessages.push({ role: 'user', content: msg.content || '' });
+          if (msg.images?.length) {
+            openAIMessages.push({
+              role: 'user',
+              content: [
+                { type: 'text', text: msg.content || 'Analyze the image.' },
+                ...msg.images.map((image) => ({
+                  type: 'image_url' as const,
+                  image_url: {
+                    url: `data:${image.mimeType};base64,${image.data}`,
+                  },
+                })),
+              ],
+            } as any);
+          } else {
+            openAIMessages.push({ role: 'user', content: msg.content || '' });
+          }
         }
       }
 

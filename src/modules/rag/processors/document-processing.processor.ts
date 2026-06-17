@@ -10,6 +10,7 @@ import { RagEventsService } from '../services/rag-events.service';
 import { GeminiProvider } from '../../../common/providers/gemini.provider';
 import { DocumentStorageService } from '../../../common/storage';
 import { WorkspaceEncryptionService } from '../../workspaces/workspace-encryption.service';
+import { KnowledgeService } from '../../knowledge/knowledge.service';
 
 @Processor('document-queue')
 export class DocumentProcessingProcessor extends WorkerHost {
@@ -24,19 +25,22 @@ export class DocumentProcessingProcessor extends WorkerHost {
     private readonly eventsService: RagEventsService,
     private readonly workspaceEncryptionService: WorkspaceEncryptionService,
     private readonly documentStorageService: DocumentStorageService,
+    private readonly knowledgeService: KnowledgeService,
   ) {
     super();
   }
 
-  async process(job: Job<{ documentId: string; mimetype: string }>): Promise<any> {
+  async process(
+    job: Job<{ documentId: string; mimetype: string }>,
+  ): Promise<any> {
     const { documentId, mimetype } = job.data;
 
     this.logger.log(`Start processing document ${documentId}`);
-    
+
     try {
       // 1. Start
-      await this.updateProgress(documentId, 10, 'Đang đọc thẻ...');
-      
+      await this.updateProgress(documentId, 10, 'Đang đọc nội dung...');
+
       // 2. Extract (giải mã nếu file đã mã hóa; bỏ qua nếu chưa mã hóa)
       const document = await this.documentRepo.findOne({
         where: { id: documentId },
@@ -58,7 +62,9 @@ export class DocumentProcessingProcessor extends WorkerHost {
             if (decrypted) {
               fileBuffer = Buffer.from(decrypted);
             } else {
-              throw new Error('Decryption returned null (DEK/Vault unavailable)');
+              throw new Error(
+                'Decryption returned null (DEK/Vault unavailable)',
+              );
             }
           } catch (e) {
             throw new Error(
@@ -90,8 +96,17 @@ export class DocumentProcessingProcessor extends WorkerHost {
         });
       }
 
-      await this.documentRepo.update(documentId, { chunk_count: chunks.length });
-      await this.updateProgress(documentId, 40, `Đã chia thành ${chunks.length} đoạn. Đang tạo vector...`);
+      await this.documentRepo.update(documentId, {
+        chunk_count: chunks.length,
+      });
+      if (document.knowledge_id) {
+        await this.knowledgeService.updateStats(document.knowledge_id);
+      }
+      await this.updateProgress(
+        documentId,
+        40,
+        `Đã chia thành ${chunks.length} đoạn. Đang tạo vector...`,
+      );
 
       // 4. Embed & Save
       // Delete old vectors if any
@@ -134,13 +149,16 @@ export class DocumentProcessingProcessor extends WorkerHost {
         );
 
         const progress = 40 + Math.floor(((i + 1) / chunks.length) * 50); // 40 -> 90
-        await this.updateProgress(documentId, progress, `Đang xử lý vector ${i + 1}/${chunks.length}...`);
+        await this.updateProgress(
+          documentId,
+          progress,
+          `Đang xử lý vector ${i + 1}/${chunks.length}...`,
+        );
       }
 
       // 5. Finish
       await this.updateProgress(documentId, 100, 'Hoàn thành!', 'indexed');
       this.logger.log(`Finished processing document ${documentId}`);
-
     } catch (error) {
       this.logger.error(`Error processing document ${documentId}`, error);
       await this.documentRepo.update(documentId, {
@@ -158,7 +176,12 @@ export class DocumentProcessingProcessor extends WorkerHost {
     }
   }
 
-  private async updateProgress(documentId: string, progress: number, message: string, status: 'processing' | 'indexed' = 'processing') {
+  private async updateProgress(
+    documentId: string,
+    progress: number,
+    message: string,
+    status: 'processing' | 'indexed' = 'processing',
+  ) {
     await this.documentRepo.update(documentId, {
       status,
       processing_progress: progress,

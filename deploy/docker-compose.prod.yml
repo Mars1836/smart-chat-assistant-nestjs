@@ -1,0 +1,19 @@
+services:
+  app:
+    image: ${IMAGE_NAME:-ghcr.io/owner/smart-chat-assistant-nestjs}:${IMAGE_TAG:-latest}
+    container_name: smart-chat-assistant
+    restart: unless-stopped
+    pull_policy: always
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    ports:
+      - "${APP_PORT:-4000}:4000"
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge

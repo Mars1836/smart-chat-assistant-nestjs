@@ -6,3 +6,5 @@ logs
 uploads
 keys
 backups
+table.sql
+table.simplified.dbml

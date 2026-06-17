@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -25,14 +18,13 @@ import { User } from '../../common/decorators';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workspaces/:workspaceId/members/:memberId/permissions')
 export class WorkspaceMemberPermissionsController {
-  constructor(
-    private readonly service: WorkspaceMemberPermissionsService,
-  ) {}
+  constructor(private readonly service: WorkspaceMemberPermissionsService) {}
 
   @Get('effective-permissions')
   @ApiOperation({
     summary: 'Lấy tất cả các quyền (Effective Permissions) của member',
-    description: 'Kết hợp quyền Role và Custom Permissions. Trả về chi tiết nguồn (Role/Custom) và trạng thái.',
+    description:
+      'Kết hợp quyền Role và Custom Permissions. Trả về chi tiết nguồn (Role/Custom) và trạng thái.',
   })
   @ApiResponse({
     status: 200,
@@ -43,12 +35,17 @@ export class WorkspaceMemberPermissionsController {
     @Param('workspaceId') workspaceId: string,
     @Param('memberId') memberId: string,
   ) {
-    const permissions = await this.service.getDetailedPermissions(workspaceId, memberId);
+    const permissions = await this.service.getDetailedPermissions(
+      workspaceId,
+      memberId,
+    );
     return { permissions };
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách quyền custom (Grant/Revoke) của member' })
+  @ApiOperation({
+    summary: 'Lấy danh sách quyền custom (Grant/Revoke) của member',
+  })
   @ApiResponse({ status: 200, description: 'List of custom permissions' })
   @RequirePermissions(WORKSPACE_PERMISSIONS.MEMBER_VIEW)
   async listPermissions(

@@ -142,10 +142,14 @@ export class ConversationsService extends BaseService<Conversation> {
     if (!chatbot) {
       throw new NotFoundException('Chatbot not found');
     }
-    console.log('userId', userId);
-    console.log('chatbot.workspace.owner_id', chatbot.workspace.owner_id);
     // Kiểm tra quyền truy cập workspace
-    if (chatbot.workspace.owner_id !== userId) {
+    const canAccessChatbot = await this.permissionsService.checkPermission(
+      chatbot.workspace_id,
+      userId,
+      WORKSPACE_PERMISSIONS.CHATBOT_CHAT,
+    );
+
+    if (!canAccessChatbot) {
       throw new ForbiddenException('You do not have access to this chatbot');
     }
 
@@ -156,7 +160,7 @@ export class ConversationsService extends BaseService<Conversation> {
     }
 
     return this.paginate(pagination, {
-      where: { chatbot_id: chatbotId },
+      where: { chatbot_id: chatbotId, user_id: userId },
       relations: ['user', 'workspace'],
     });
   }

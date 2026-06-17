@@ -31,7 +31,11 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
-import { CreateDocumentDto, UpdateDocumentDto, DocumentResponseDto } from './dto';
+import {
+  CreateDocumentDto,
+  UpdateDocumentDto,
+  DocumentResponseDto,
+} from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../common/decorators';
 import {
@@ -129,7 +133,7 @@ export class DocumentsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: DOCUMENT_UPLOAD_MAX_SIZE })
+          new MaxFileSizeValidator({ maxSize: DOCUMENT_UPLOAD_MAX_SIZE }),
         ],
       }),
     )
@@ -175,7 +179,8 @@ export class DocumentsController {
             workspace_id: 'workspace-uuid-here',
             user_id: 'user-uuid-here',
             file_name: 'tai-lieu.pdf',
-            file_url: 'gs://my-chatbot-bucket/documents/workspace-id/abc123.pdf',
+            file_url:
+              'gs://my-chatbot-bucket/documents/workspace-id/abc123.pdf',
             type: 'pdf',
             size: 1024000,
             uploaded_at: '2024-01-01T00:00:00.000Z',
@@ -227,8 +232,11 @@ export class DocumentsController {
 
     try {
       const payload = this.jwtService.verify(token);
-      
-      if (payload.type !== 'document_access' || payload.workspaceId !== workspaceId) {
+
+      if (
+        payload.type !== 'document_access' ||
+        payload.workspaceId !== workspaceId
+      ) {
         throw new UnauthorizedException('Invalid token for this workspace');
       }
 
@@ -247,9 +255,11 @@ export class DocumentsController {
       });
 
       return new StreamableFile(buffer, { type: mimetype });
-
     } catch (e) {
-      if (e instanceof UnauthorizedException || e.name === 'JsonWebTokenError') {
+      if (
+        e instanceof UnauthorizedException ||
+        e.name === 'JsonWebTokenError'
+      ) {
         throw new UnauthorizedException('Invalid or expired token');
       }
       throw e;
@@ -265,9 +275,9 @@ export class DocumentsController {
     description: 'Access token generated',
     schema: {
       properties: {
-        token: { type: 'string' }
-      }
-    }
+        token: { type: 'string' },
+      },
+    },
   })
   @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_VIEW)
   async getAccessToken(
@@ -359,4 +369,3 @@ export class DocumentsController {
     return this.ragEventsService.subscribeToDocument(id);
   }
 }
-

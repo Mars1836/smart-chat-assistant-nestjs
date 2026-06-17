@@ -23,10 +23,12 @@ export class RagEventsService {
   /**
    * Subscribe to progress events for a specific document
    */
-  subscribeToDocument(documentId: string): Observable<{ data: RagProgressEvent }> {
+  subscribeToDocument(
+    documentId: string,
+  ): Observable<{ data: RagProgressEvent }> {
     return this.progressSubject.asObservable().pipe(
-      filter(event => event.documentId === documentId),
-      map(event => ({ data: event })) // Format for SSE
+      filter((event) => event.documentId === documentId),
+      map((event) => ({ data: event })), // Format for SSE
     );
   }
 }

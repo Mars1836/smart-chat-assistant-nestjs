@@ -9,7 +9,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         transport: {
-          host: configService.get<string>('NODEMAILER_HOST') ?? 'smtp.gmail.com',
+          host:
+            configService.get<string>('NODEMAILER_HOST') ?? 'smtp.gmail.com',
           port: configService.get<number>('NODEMAILER_PORT') ?? 587,
           secure: false, // true for 465, false for other ports
           auth: {

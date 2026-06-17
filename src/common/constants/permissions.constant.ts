@@ -19,6 +19,13 @@ export const WORKSPACE_PERMISSIONS = {
   CHATBOT_CHAT: 'chatbot.chat',
   CHATBOT_VIEW_LOGS: 'chatbot.view_logs',
 
+  // Knowledge Resources
+  KNOWLEDGE_VIEW: 'knowledge.view',
+  KNOWLEDGE_CREATE: 'knowledge.create',
+  KNOWLEDGE_UPDATE: 'knowledge.update',
+  KNOWLEDGE_DELETE: 'knowledge.delete',
+  KNOWLEDGE_ASSIGN_CHATBOT: 'knowledge.assign_chatbot',
+
   // Document Resources
   DOCUMENT_UPLOAD: 'document.upload',
   DOCUMENT_UPDATE: 'document.update',

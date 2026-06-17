@@ -148,7 +148,7 @@ export class WorkspacePermissionsService {
   async getDetailedUserPermissions(workspaceId: string, userId: string) {
     // 0. Get all system permissions
     const allSystemPermissions = await this.getAllPermissions();
-    
+
     // 1. Get member details
     const member = await this.memberRepo.findOne({
       where: { workspace_id: workspaceId, user_id: userId, is_active: true },
@@ -162,7 +162,9 @@ export class WorkspacePermissionsService {
       where: { workspace_role_id: member.workspaceRole.id },
       relations: ['permission'],
     });
-    const rolePermissionSet = new Set(rolePermissions.map((rp) => rp.permission.name));
+    const rolePermissionSet = new Set(
+      rolePermissions.map((rp) => rp.permission.name),
+    );
 
     // 3. Get custom permissions
     const customPermissions = await this.memberPermissionRepo.find({
@@ -170,29 +172,30 @@ export class WorkspacePermissionsService {
       relations: ['permission'],
     });
     const customMap = new Map<string, 'grant' | 'revoke'>();
-    customPermissions.forEach(cp => {
+    customPermissions.forEach((cp) => {
       customMap.set(cp.permission.name, cp.grant_type);
     });
 
     // 4. Build detailed result
-    return allSystemPermissions.map(p => {
+    return allSystemPermissions.map((p) => {
       const fromRole = rolePermissionSet.has(p.name);
       const customGrant = customMap.get(p.name);
-      
+
       let effectiveAuth = false;
       let source = 'NONE'; // ROLE, CUSTOM, NONE
       let details = '';
 
       if (customGrant) {
-         source = 'CUSTOM';
-         effectiveAuth = (customGrant === 'grant');
-         details = customGrant === 'grant' ? 'Granted explicitly' : 'Revoked explicitly';
+        source = 'CUSTOM';
+        effectiveAuth = customGrant === 'grant';
+        details =
+          customGrant === 'grant' ? 'Granted explicitly' : 'Revoked explicitly';
       } else {
-         if (fromRole) {
-            source = 'ROLE';
-            effectiveAuth = true;
-            details = `Inherited from ${member.workspaceRole.name}`;
-         }
+        if (fromRole) {
+          source = 'ROLE';
+          effectiveAuth = true;
+          details = `Inherited from ${member.workspaceRole.name}`;
+        }
       }
 
       // Handle Owner case explicitly?

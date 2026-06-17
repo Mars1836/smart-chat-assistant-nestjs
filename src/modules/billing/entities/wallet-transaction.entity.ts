@@ -44,4 +44,3 @@ export class WalletTransaction extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
 }
-

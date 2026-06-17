@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { BillingService } from '../billing/billing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Chatbot } from '../chatbots/entities/chatbot.entity';
@@ -11,6 +17,8 @@ import { WidgetPublicConfigDto } from './dto/widget-public-config.dto';
 
 @Injectable()
 export class WidgetService {
+  private readonly logger = new Logger(WidgetService.name);
+
   constructor(
     @InjectRepository(Chatbot)
     private readonly chatbotRepo: Repository<Chatbot>,
@@ -19,6 +27,7 @@ export class WidgetService {
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
     private readonly widgetChatOrchestrator: WidgetChatOrchestratorService,
+    private readonly billingService: BillingService,
   ) {}
 
   getPublicConfig(
@@ -35,15 +44,25 @@ export class WidgetService {
   }
 
   async chat(
+    chatbotId: string,
     dto: WidgetChatDto,
-  ): Promise<{ response: string; conversation_id: string; files?: any[]; cards?: any[] }> {
+  ): Promise<{
+    response: string;
+    conversation_id: string;
+    files?: any[];
+    cards?: any[];
+  }> {
     const chatbot = await this.chatbotRepo.findOne({
-      where: { id: dto.chatbotId },
+      where: { id: chatbotId },
     });
 
     if (!chatbot || !chatbot.enabled) {
       throw new NotFoundException('Chatbot not found or disabled');
     }
+
+    await this.billingService.assertWalletHasCreditsForChat(
+      chatbot.workspace_id,
+    );
 
     // 1. Get or create conversation
     let conversation: Conversation;
@@ -88,6 +107,11 @@ export class WidgetService {
       userMessage: dto.message,
       chatbot: chatbot,
     });
+
+    const pluginNames = (result.toolsUsed ?? []).map((t) => t.tool_name);
+    this.logger.log(
+      `[widget-chat] completed chatbotId=${chatbot.id} conversationId=${conversation.id} plugin_calls=${pluginNames.length} tools=${JSON.stringify(pluginNames)}`,
+    );
 
     // 4. Save bot response (kèm token usage và tools đã dùng)
     const botMessage = this.messageRepo.create({

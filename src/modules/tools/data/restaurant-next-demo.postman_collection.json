@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "Saigon Gourmet - Restaurant API",
+    "description": "Postman collection cho API thực đơn, chi nhánh, khung giờ trống và đặt bàn của Saigon Gourmet.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://restaurant-six-ebon.vercel.app"
+    },
+    {
+      "key": "branchId",
+      "value": "cn-q1"
+    },
+    {
+      "key": "date",
+      "value": "2026-05-18"
+    },
+    {
+      "key": "time",
+      "value": "19:00"
+    },
+    {
+      "key": "partySize",
+      "value": "2"
+    },
+    {
+      "key": "phone",
+      "value": "0901234567"
+    },
+    {
+      "key": "dishSlug",
+      "value": "bo-bit-tet-sot-tieu-den"
+    }
+  ],
+  "item": [
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "Get Hot Dishes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Lấy danh sách món ăn bán chạy, nổi bật của nhà hàng.",
+            "url": "{{baseUrl}}/api/menu/hot?limit=6"
+          },
+          "response": []
+        },
+        {
+          "name": "List Dishes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Lấy danh sách món ăn; có thể lọc theo category, maxPrice và từ khóa tìm kiếm.",
+            "url": "{{baseUrl}}/api/menu?category=mon-chinh&maxPrice=500000&search=bo"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dish Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Lấy thông tin chi tiết món ăn theo slug.",
+            "url": "{{baseUrl}}/api/menu/{{dishSlug}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Branches",
+      "item": [
+        {
+          "name": "List Branches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Lấy danh sách chi nhánh nhà hàng.",
+            "url": "{{baseUrl}}/api/branches"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Check Available Slots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Lấy các khung giờ còn bàn trống theo chi nhánh, ngày và số người.",
+            "url": "{{baseUrl}}/api/reservations/slots?branchId={{branchId}}&date={{date}}&partySize={{partySize}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Tạo đặt bàn mới cho nhà hàng.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"date\": \"{{date}}\",\n  \"time\": \"{{time}}\",\n  \"partySize\": 2,\n  \"customerName\": \"Nguyen Van A\",\n  \"phone\": \"{{phone}}\",\n  \"note\": \"Muon ban gan cua so neu con.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/reservations"
+          },
+          "response": []
+        },
+        {
+          "name": "Lookup Reservations By Phone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Tra cứu các lượt đặt bàn đã xác nhận theo số điện thoại khách.",
+            "url": "{{baseUrl}}/api/reservations/lookup?phone={{phone}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

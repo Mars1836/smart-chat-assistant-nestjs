@@ -1,9 +1,6 @@
 import { IsString, IsOptional, IsUUID, IsObject } from 'class-validator';
 
 export class WidgetChatDto {
-  @IsUUID()
-  chatbotId: string;
-
   @IsString()
   message: string;
 
@@ -29,4 +26,3 @@ export class WidgetChatResponseDto {
   files?: any[];
   cards?: any[];
 }
-

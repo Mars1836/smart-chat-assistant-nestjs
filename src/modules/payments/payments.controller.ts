@@ -1,4 +1,11 @@
-import { Body, Controller, Headers, HttpCode, Logger, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  Logger,
+  Post,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BillingService } from '../billing/billing.service';
 
@@ -45,9 +52,7 @@ export class PaymentsController {
     @Headers('authorization') authHeader: string,
     @Body() payload: SePayCallbackPayload,
   ) {
-    this.logger.log(
-      `SePay callback received: ${JSON.stringify(payload)}`,
-    );
+    this.logger.log(`SePay callback received: ${JSON.stringify(payload)}`);
 
     const expectedApiKey =
       this.configService.get<string>('SEPAY_API_KEY') || '';
@@ -83,7 +88,9 @@ export class PaymentsController {
     }
 
     const sessionCode = match[1].toUpperCase();
-    this.logger.log(`SePay callback: resolved topup session code=${sessionCode}`);
+    this.logger.log(
+      `SePay callback: resolved topup session code=${sessionCode}`,
+    );
 
     const amount = Number(payload.transferAmount || 0);
 
@@ -113,4 +120,3 @@ export class PaymentsController {
     };
   }
 }
-

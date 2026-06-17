@@ -35,8 +35,7 @@ export class PaymentsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
-    const sortBy =
-      query.sortBy === 'amount' ? 'amount' : 'created_at';
+    const sortBy = query.sortBy === 'amount' ? 'amount' : 'created_at';
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.paymentRepository
@@ -77,9 +76,7 @@ export class PaymentsService {
     const isAdmin = await this.usersService.isAdmin(currentUserId);
     const paymentUserId = payment.user?.id;
     if (!isAdmin && paymentUserId !== currentUserId) {
-      throw new ForbiddenException(
-        'Chỉ được xem giao dịch của chính mình',
-      );
+      throw new ForbiddenException('Chỉ được xem giao dịch của chính mình');
     }
     return payment;
   }
@@ -92,58 +89,71 @@ export class PaymentsService {
     filterUserId?: string,
   ): Promise<PaymentStatsSummaryDto> {
     const isAdmin = await this.usersService.isAdmin(currentUserId);
-    const userId = isAdmin && filterUserId ? filterUserId : currentUserId;
     if (!isAdmin && filterUserId) {
-      // User không được filter theo user khác
       throw new ForbiddenException('Forbidden');
+    }
+    // User thường: chỉ thống kê của mình. Admin + user_id: một user. Admin không user_id: toàn hệ thống (giống GET /payments).
+    let userId: string | undefined;
+    if (!isAdmin) {
+      userId = currentUserId;
+    } else if (filterUserId) {
+      userId = filterUserId;
+    } else {
+      userId = undefined;
     }
 
     const userWhere = userId ? 'p.user_id = :userId' : '1=1';
     const userParams = userId ? { userId } : {};
 
-    const [totalCount, totalSuccessAmount, byStatusRows, byProviderRows, last7, last30] =
-      await Promise.all([
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .where(userWhere, userParams)
-          .getCount(),
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .select('COALESCE(SUM(p.amount), 0)', 'sum')
-          .where('p.status = :status', { status: 'success' })
-          .andWhere(userWhere, userParams)
-          .getRawOne<{ sum: string }>(),
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .select('p.status', 'status')
-          .addSelect('COUNT(p.id)', 'count')
-          .where(userWhere, userParams)
-          .groupBy('p.status')
-          .getRawMany<{ status: string; count: string }>(),
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .select('p.provider', 'provider')
-          .addSelect('COUNT(p.id)', 'count')
-          .where(userWhere, userParams)
-          .groupBy('p.provider')
-          .getRawMany<{ provider: string; count: string }>(),
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .where('p.status = :status', { status: 'success' })
-          .andWhere('p.created_at >= :since', {
-            since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          })
-          .andWhere(userWhere, userParams)
-          .getCount(),
-        this.paymentRepository
-          .createQueryBuilder('p')
-          .where('p.status = :status', { status: 'success' })
-          .andWhere('p.created_at >= :since', {
-            since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-          })
-          .andWhere(userWhere, userParams)
-          .getCount(),
-      ]);
+    const [
+      totalCount,
+      totalSuccessAmount,
+      byStatusRows,
+      byProviderRows,
+      last7,
+      last30,
+    ] = await Promise.all([
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .where(userWhere, userParams)
+        .getCount(),
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'sum')
+        .where('p.status = :status', { status: 'success' })
+        .andWhere(userWhere, userParams)
+        .getRawOne<{ sum: string }>(),
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .select('p.status', 'status')
+        .addSelect('COUNT(p.id)', 'count')
+        .where(userWhere, userParams)
+        .groupBy('p.status')
+        .getRawMany<{ status: string; count: string }>(),
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .select('p.provider', 'provider')
+        .addSelect('COUNT(p.id)', 'count')
+        .where(userWhere, userParams)
+        .groupBy('p.provider')
+        .getRawMany<{ provider: string; count: string }>(),
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .where('p.status = :status', { status: 'success' })
+        .andWhere('p.created_at >= :since', {
+          since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        })
+        .andWhere(userWhere, userParams)
+        .getCount(),
+      this.paymentRepository
+        .createQueryBuilder('p')
+        .where('p.status = :status', { status: 'success' })
+        .andWhere('p.created_at >= :since', {
+          since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        })
+        .andWhere(userWhere, userParams)
+        .getCount(),
+    ]);
 
     const by_status: Record<string, number> = {};
     for (const row of byStatusRows) {
@@ -172,9 +182,16 @@ export class PaymentsService {
     currentUserId: string,
   ): Promise<PaymentStatsByDateItemDto[]> {
     const isAdmin = await this.usersService.isAdmin(currentUserId);
-    const userId = isAdmin && query.user_id ? query.user_id : currentUserId;
     if (!isAdmin && query.user_id) {
       throw new ForbiddenException('Forbidden');
+    }
+    let userId: string | undefined;
+    if (!isAdmin) {
+      userId = currentUserId;
+    } else if (query.user_id) {
+      userId = query.user_id;
+    } else {
+      userId = undefined;
     }
 
     const to = query.to ? new Date(query.to) : new Date();
@@ -182,13 +199,17 @@ export class PaymentsService {
       ? new Date(query.from)
       : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
     const groupBy = query.groupBy ?? 'day';
-    const trunc = groupBy === 'month' ? 'month' : groupBy === 'week' ? 'week' : 'day';
+    const trunc =
+      groupBy === 'month' ? 'month' : groupBy === 'week' ? 'week' : 'day';
 
     const qb = this.paymentRepository
       .createQueryBuilder('p')
       .select(`date_trunc('${trunc}', p.created_at)::date`, 'date')
       .addSelect('COUNT(p.id)', 'count')
-      .addSelect('COALESCE(SUM(CASE WHEN p.status = \'success\' THEN p.amount ELSE 0 END), 0)', 'amount')
+      .addSelect(
+        "COALESCE(SUM(CASE WHEN p.status = 'success' THEN p.amount ELSE 0 END), 0)",
+        'amount',
+      )
       .where('p.created_at >= :from', { from })
       .andWhere('p.created_at <= :to', { to })
       .groupBy(`date_trunc('${trunc}', p.created_at)`)
@@ -198,10 +219,17 @@ export class PaymentsService {
       qb.andWhere('p.user_id = :userId', { userId });
     }
 
-    const rows = await qb.getRawMany<{ date: Date; count: string; amount: string }>();
+    const rows = await qb.getRawMany<{
+      date: Date;
+      count: string;
+      amount: string;
+    }>();
 
     return rows.map((r) => ({
-      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+      date:
+        r.date instanceof Date
+          ? r.date.toISOString().slice(0, 10)
+          : String(r.date).slice(0, 10),
       count: parseInt(r.count, 10),
       amount: r.amount ?? '0',
     }));

@@ -19,13 +19,19 @@ export class CreateLlmModelDto {
   @MaxLength(120)
   model: string;
 
-  @ApiProperty({ example: 0.0005, description: 'Giá per 1K input tokens (credits)' })
+  @ApiProperty({
+    example: 0.0005,
+    description: 'Giá per 1K input tokens (credits)',
+  })
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   price_per_1k_input_tokens: number;
 
-  @ApiProperty({ example: 0.0015, description: 'Giá per 1K output tokens (credits)' })
+  @ApiProperty({
+    example: 0.0015,
+    description: 'Giá per 1K output tokens (credits)',
+  })
   @Type(() => Number)
   @IsNumber()
   @Min(0)

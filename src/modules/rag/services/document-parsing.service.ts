@@ -41,7 +41,12 @@ function parseCsvContexts(content: string): string[] {
         if (peek() === ',') next();
       } else {
         let field = '';
-        while (i < len && peek() !== ',' && peek() !== '\r' && peek() !== '\n') {
+        while (
+          i < len &&
+          peek() !== ',' &&
+          peek() !== '\r' &&
+          peek() !== '\n'
+        ) {
           field += peek();
           next();
         }
@@ -55,7 +60,10 @@ function parseCsvContexts(content: string): string[] {
   const header = rows[0].map((h) => h.toLowerCase());
   const contextIdx = header.findIndex((h) => h === 'context');
   const colIdx = contextIdx >= 0 ? contextIdx : 0;
-  return rows.slice(1).map((r) => r[colIdx] || '').filter((s) => s.trim() !== '');
+  return rows
+    .slice(1)
+    .map((r) => r[colIdx] || '')
+    .filter((s) => s.trim() !== '');
 }
 
 // Supported image MIME types (full + extensions)
@@ -159,7 +167,7 @@ export class DocumentParsingService {
       // CSV: lấy cột "context" (hoặc cột đầu tiên) làm nội dung knowledge
       if (normalizedMime === 'text/csv') {
         const text = buffer.toString('utf-8');
-         const contexts = parseCsvContexts(text);
+        const contexts = parseCsvContexts(text);
         return contexts.join('\n\n---\n\n');
       }
 

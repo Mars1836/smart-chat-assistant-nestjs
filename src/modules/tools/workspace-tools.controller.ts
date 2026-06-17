@@ -89,11 +89,7 @@ export class WorkspaceToolsController {
         const name = t.name?.toLowerCase?.() || '';
         const display = t.display_name?.toLowerCase?.() || '';
         const desc = t.description?.toLowerCase?.() || '';
-        return (
-          name.includes(q) ||
-          display.includes(q) ||
-          desc.includes(q)
-        );
+        return name.includes(q) || display.includes(q) || desc.includes(q);
       });
     }
 
@@ -132,7 +128,8 @@ export class WorkspaceToolsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'List of installed tools with workspace_tool and user_auth_status',
+    description:
+      'List of installed tools with workspace_tool and user_auth_status',
   })
   @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
   async getInstalledTools(
@@ -162,11 +159,7 @@ export class WorkspaceToolsController {
         const name = t.name?.toLowerCase?.() || '';
         const display = t.display_name?.toLowerCase?.() || '';
         const desc = t.description?.toLowerCase?.() || '';
-        return (
-          name.includes(q) ||
-          display.includes(q) ||
-          desc.includes(q)
-        );
+        return name.includes(q) || display.includes(q) || desc.includes(q);
       });
     }
 
@@ -199,7 +192,10 @@ export class WorkspaceToolsController {
 
   @Post('custom')
   @ApiOperation({ summary: 'Tạo custom tool/plugin mới cho workspace' })
-  @ApiResponse({ status: 201, description: 'Custom tool created and added to workspace' })
+  @ApiResponse({
+    status: 201,
+    description: 'Custom tool created and added to workspace',
+  })
   @ApiBody({ type: CreateToolDto })
   @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_MANAGE_PLUGINS)
   async createCustomTool(
@@ -218,7 +214,9 @@ export class WorkspaceToolsController {
       ...toolWithMeta,
       workspace_tool: {
         is_enabled: workspaceTool.is_enabled,
-        config_override: maskApiKeyInConfigOverride(workspaceTool.config_override),
+        config_override: maskApiKeyInConfigOverride(
+          workspaceTool.config_override,
+        ),
         added_by: workspaceTool.added_by,
         created_at: workspaceTool.created_at,
         updated_at: workspaceTool.updated_at,
@@ -249,7 +247,9 @@ export class WorkspaceToolsController {
       ...toolWithMeta,
       workspace_tool: {
         is_enabled: workspaceTool.is_enabled,
-        config_override: maskApiKeyInConfigOverride(workspaceTool.config_override),
+        config_override: maskApiKeyInConfigOverride(
+          workspaceTool.config_override,
+        ),
         added_by: workspaceTool.added_by,
         created_at: workspaceTool.created_at,
         updated_at: workspaceTool.updated_at,
@@ -288,7 +288,8 @@ export class WorkspaceToolsController {
   @Delete(':toolId')
   @ApiOperation({
     summary: 'Gỡ tool khỏi workspace',
-    description: 'Gỡ cài đặt plugin khỏi workspace và tất cả chatbots thuộc workspace',
+    description:
+      'Gỡ cài đặt plugin khỏi workspace và tất cả chatbots thuộc workspace',
   })
   @ApiResponse({ status: 204, description: 'Tool removed from workspace' })
   @RequirePermissions(WORKSPACE_PERMISSIONS.WORKSPACE_MANAGE_PLUGINS)
@@ -318,6 +319,10 @@ export class WorkspaceToolsController {
   ): Promise<void> {
     // user.sub là ID user từ JWT (tuỳ bạn map), fallback sang user.id nếu cần
     const userId = user?.sub ?? user?.id;
-    await this.workspaceToolsService.deleteCustomTool(workspaceId, toolId, userId);
+    await this.workspaceToolsService.deleteCustomTool(
+      workspaceId,
+      toolId,
+      userId,
+    );
   }
 }

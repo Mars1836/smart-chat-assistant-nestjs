@@ -18,10 +18,7 @@ import {
   PaymentStatsByDateQueryDto,
   PaymentStatsByDateItemDto,
 } from './dto';
-import {
-  PaginatedResponseDto,
-  PaginationMetaDto,
-} from '../../common/dto';
+import { PaginatedResponseDto, PaginationMetaDto } from '../../common/dto';
 
 @ApiTags('payments')
 @ApiBearerAuth('JWT-auth')
@@ -120,12 +117,12 @@ export class PaymentsApiController {
     type: PaymentResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Chỉ được xem giao dịch của chính mình' })
+  @ApiResponse({
+    status: 403,
+    description: 'Chỉ được xem giao dịch của chính mình',
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
-  findOne(
-    @Param('id') id: string,
-    @User('sub') currentUserId: string,
-  ) {
+  findOne(@Param('id') id: string, @User('sub') currentUserId: string) {
     return this.paymentsService.findOne(id, currentUserId);
   }
 }

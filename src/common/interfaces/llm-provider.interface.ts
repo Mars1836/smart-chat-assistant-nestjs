@@ -1,6 +1,10 @@
 export interface LLMMessage {
   role: 'user' | 'assistant' | 'function' | 'system';
   content?: string;
+  images?: Array<{
+    mimeType: string;
+    data: string;
+  }>;
   name?: string; // For function/tool responses
   functionCall?: {
     name: string;
@@ -16,7 +20,7 @@ export interface LLMTool_FunctionDeclaration {
   name: string;
   description: string;
   parameters?: {
-    type: 'OBJECT';
+    type: 'object' | 'OBJECT';
     properties: Record<string, any>;
     required?: string[];
   };

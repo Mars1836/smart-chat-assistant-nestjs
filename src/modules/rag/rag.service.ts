@@ -25,7 +25,7 @@ export class RagService {
       mimetype,
       userId,
     });
-    
+
     // Initial event
     this.eventsService.emitProgress({
       documentId,
@@ -43,7 +43,11 @@ export class RagService {
    */
   async search(
     query: string,
-    options: { workspaceId?: string; knowledgeIds?: string[]; minScore?: number },
+    options: {
+      workspaceId?: string;
+      knowledgeIds?: string[];
+      minScore?: number;
+    },
     limit = 5,
   ): Promise<string[]> {
     try {
@@ -53,11 +57,17 @@ export class RagService {
       const embedding = await this.aiStudio.generateEmbedding(query);
 
       // 2. Search vectors with knowledge filter
-      const results = await this.vectorStoreService.search(embedding, limit, options);
-      
+      const results = await this.vectorStoreService.search(
+        embedding,
+        limit,
+        options,
+      );
+
       this.logger.log(`Found ${results.length} relevant documents`);
       results.forEach((r, idx) => {
-        this.logger.debug(`Result ${idx + 1}: [Score: ${r.similarity}] ${r.content.substring(0, 100)}...`);
+        this.logger.debug(
+          `Result ${idx + 1}: [Score: ${r.similarity}] ${r.content.substring(0, 100)}...`,
+        );
       });
 
       // 3. Return content
@@ -89,9 +99,9 @@ export class RagService {
    * Retry indexing
    */
   async retryIndex(documentId: string) {
-     // Implementation requires retrieving document details from DB.
-     // For now, simpler to re-upload or handle in integration layer.
-     throw new Error('Not implemented yet'); 
+    // Implementation requires retrieving document details from DB.
+    // For now, simpler to re-upload or handle in integration layer.
+    throw new Error('Not implemented yet');
   }
 
   /**

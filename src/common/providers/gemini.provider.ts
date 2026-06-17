@@ -11,6 +11,10 @@ import {
 // Keep internal interfaces if needed for direct API mapping
 interface GeminiPart {
   text?: string;
+  inline_data?: {
+    mime_type: string;
+    data: string;
+  };
   functionCall?: { name: string; args: any };
   functionResponse?: { name: string; response: any };
 }
@@ -40,6 +44,121 @@ export class GeminiProvider implements ILLMProvider {
     this.genAI = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
+  private normalizeModelName(model: string): string {
+    if (!model) return model;
+
+    if (model.startsWith('models/')) {
+      return model.slice('models/'.length);
+    }
+
+    if (model.startsWith('gemini:')) {
+      return model.slice('gemini:'.length);
+    }
+
+    return model;
+  }
+
+  private shouldStripInvalidFunctionCalls(errorText: string): boolean {
+    return (
+      errorText.includes('thought_signature') &&
+      errorText.includes('functionCall')
+    );
+  }
+
+  private buildGeminiMessages(
+    messages: LLMMessage[],
+    config?: LLMConfig,
+    stripInvalidFunctionCalls = false,
+  ): GeminiMessage[] {
+    const geminiMessages: GeminiMessage[] = [];
+
+    if (config?.systemInstruction) {
+      geminiMessages.push({
+        role: 'user',
+        parts: [{ text: `[System Instructions]: ${config.systemInstruction}` }],
+      });
+      geminiMessages.push({
+        role: 'model',
+        parts: [{ text: 'Understood.' }],
+      });
+    }
+
+    for (const msg of messages) {
+      if (msg.role === 'function' && msg.functionResponse) {
+        const raw = msg.functionResponse.response;
+        const response =
+          raw !== null && typeof raw === 'object' && !Array.isArray(raw)
+            ? raw
+            : { result: raw };
+
+        geminiMessages.push({
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: msg.functionResponse.name,
+                response,
+              },
+            },
+          ],
+        });
+        continue;
+      }
+
+      if (msg.role === 'assistant') {
+        const parts: GeminiPart[] = [];
+        if (msg.content) parts.push({ text: msg.content });
+
+        const rawFunctionCall = msg.functionCall as
+          | ({ name: string; args: any; thought_signature?: string } & Record<
+              string,
+              any
+            >)
+          | undefined;
+
+        if (rawFunctionCall) {
+          const hasThoughtSignature =
+            typeof rawFunctionCall.thought_signature === 'string' &&
+            rawFunctionCall.thought_signature.length > 0;
+
+          if (!stripInvalidFunctionCalls || hasThoughtSignature) {
+            parts.push({
+              functionCall: rawFunctionCall,
+            });
+          } else {
+            this.logger.warn(
+              `Skipping invalid Gemini functionCall without thought_signature: ${rawFunctionCall.name}`,
+            );
+          }
+        }
+
+        if (parts.length > 0) {
+          geminiMessages.push({ role: 'model', parts });
+        }
+        continue;
+      }
+
+      const text = (msg.content && String(msg.content).trim()) || ' ';
+      const parts: GeminiPart[] = [{ text }];
+
+      for (const image of msg.images ?? []) {
+        parts.push({
+          inline_data: {
+            mime_type: image.mimeType,
+            data: image.data,
+          },
+        });
+      }
+
+      geminiMessages.push({
+        role: 'user',
+        parts,
+      });
+    }
+
+    return geminiMessages;
+  }
+
   async generateResponse(
     model: string,
     prompt: string,
@@ -55,99 +174,74 @@ export class GeminiProvider implements ILLMProvider {
     config?: LLMConfig,
   ): Promise<LLMResponse> {
     try {
-      const geminiMessages: GeminiMessage[] = [];
-
-      // 1. System Instruction
-      if (config?.systemInstruction) {
-        geminiMessages.push({
-          role: 'user',
-          parts: [{ text: `[System Instructions]: ${config.systemInstruction}` }],
-        });
-        geminiMessages.push({
-          role: 'model',
-          parts: [{ text: 'Understood.' }],
-        });
-      }
-
-      // 2. Map messages (Gemini API only accepts role 'user' or 'model'; function response goes as 'user')
-      for (const msg of messages) {
-        if (msg.role === 'function' && msg.functionResponse) {
-          // Gemini expects response to be an object (Struct), not an array or primitive
-          const raw = msg.functionResponse.response;
-          const response =
-            raw !== null && typeof raw === 'object' && !Array.isArray(raw)
-              ? raw
-              : { result: raw };
-
-          geminiMessages.push({
-            role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name: msg.functionResponse.name,
-                  response,
-                },
-              },
-            ],
-          });
-        } else if (msg.role === 'assistant') {
-          const parts: GeminiPart[] = [];
-          if (msg.content) parts.push({ text: msg.content });
-          if (msg.functionCall)
-            parts.push({
-              functionCall: {
-                name: msg.functionCall.name,
-                args: msg.functionCall.args,
-              },
-            });
-          if (parts.length > 0) {
-            geminiMessages.push({ role: 'model', parts });
-          }
-        } else {
-          // USER or SYSTEM: must have at least one non-empty part (Gemini rejects empty parts)
-          const text = (msg.content && String(msg.content).trim()) || ' ';
-          geminiMessages.push({
-            role: 'user',
-            parts: [{ text }],
-          });
-        }
-      }
-
-      if (geminiMessages.length === 0) {
-        throw new Error(
-          'Gemini API requires at least one content with parts. No valid messages to send.',
+      const normalizedModel = this.normalizeModelName(model);
+      const execute = async (stripInvalidFunctionCalls = false) => {
+        const geminiMessages = this.buildGeminiMessages(
+          messages,
+          config,
+          stripInvalidFunctionCalls,
         );
-      }
 
-      const requestBody: any = {
-        contents: geminiMessages,
-        generationConfig: {
-          temperature: config?.temperature ?? 0.7,
-          maxOutputTokens: config?.maxTokens ?? 1000,
-          topP: 0.95,
-          topK: 40,
-        },
+        if (geminiMessages.length === 0) {
+          throw new Error(
+            'Gemini API requires at least one content with parts. No valid messages to send.',
+          );
+        }
+
+        const requestBody: any = {
+          contents: geminiMessages,
+          generationConfig: {
+            temperature: config?.temperature ?? 0.7,
+            maxOutputTokens: config?.maxTokens ?? 1000,
+            topP: 0.95,
+            topK: 40,
+          },
+        };
+
+        if (config?.tools && config.tools.length > 0) {
+          requestBody.tools = [{ function_declarations: config.tools }];
+        }
+
+        const response = await fetch(
+          `${this.baseUrl}/models/${normalizedModel}:generateContent?key=${this.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          },
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const error = new Error(
+            `Gemini API error: ${response.status} - ${errorText}`,
+          );
+          (error as any).responseText = errorText;
+          throw error;
+        }
+
+        return response.json();
       };
 
-      if (config?.tools && config.tools.length > 0) {
-        requestBody.tools = [{ function_declarations: config.tools }];
+      let data: any;
+      try {
+        data = await execute(false);
+      } catch (error) {
+        const errorText =
+          error instanceof Error
+            ? ((error as any).responseText ?? error.message)
+            : String(error);
+
+        if (!this.shouldStripInvalidFunctionCalls(errorText)) {
+          throw error;
+        }
+
+        this.logger.warn(
+          'Retrying Gemini request after stripping invalid functionCall parts without thought_signature.',
+        );
+        data = await execute(true);
       }
 
-      const response = await fetch(
-        `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        },
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Gemini API error: ${response.status} - ${error}`);
-      }
-
-      const data = await response.json();
       if (!data.candidates || data.candidates.length === 0) {
         throw new Error('No response from Gemini API');
       }
@@ -159,7 +253,9 @@ export class GeminiProvider implements ILLMProvider {
         .filter((p: any) => p.functionCall)
         .map((p: any) => p.functionCall);
 
-      const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
+      const textParts = parts
+        .filter((p: any) => p.text)
+        .map((p: any) => p.text);
       const text = textParts.length > 0 ? textParts.join('\n') : undefined;
 
       const usageMeta = (data as any).usageMetadata;
@@ -257,7 +353,9 @@ Provide the extracted content in a clear, organized format.`;
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Gemini Vision API error: ${response.status} - ${error}`);
+        throw new Error(
+          `Gemini Vision API error: ${response.status} - ${error}`,
+        );
       }
 
       const data = await response.json();
@@ -298,20 +396,19 @@ Format the description in a way that would be useful for text search and retriev
   }
 
   async listModels(): Promise<string[]> {
-      // const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
-      // if (!response.ok) {
-      //   throw new Error(`Failed to list models: ${response.status}`);
-      // }
-      // const data = (await response.json()) as { models?: Array<{ name: string }> };
-      const allowedModels = [
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-      ];
+    // const response = await fetch(`${this.baseUrl}/models?key=${this.apiKey}`);
+    // if (!response.ok) {
+    //   throw new Error(`Failed to list models: ${response.status}`);
+    // }
+    // const data = (await response.json()) as { models?: Array<{ name: string }> };
+    const allowedModels = [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
 
-      return allowedModels;
-    }
-  
+    return allowedModels;
+  }
 }

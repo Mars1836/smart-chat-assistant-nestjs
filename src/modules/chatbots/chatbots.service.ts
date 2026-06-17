@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
@@ -26,12 +25,13 @@ import {
 import { GeminiProvider } from '../../common/providers/gemini.provider';
 import { RagService } from '../rag/rag.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
-import { ToolExecutorService } from '../tools/tool-executor.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResult } from '../../common/interfaces/pagination.interface';
 import { BaseService } from '../../common/services/base.service';
 import { ChatOrchestratorService } from './chat-orchestrator.service';
 import { LlmModelService } from '../billing/llm-model.service';
+import { BillingService } from '../billing/billing.service';
+import { ChatEventsService } from './chat-events.service';
 
 @Injectable()
 export class ChatbotsService extends BaseService<Chatbot> {
@@ -51,16 +51,70 @@ export class ChatbotsService extends BaseService<Chatbot> {
     private readonly aiStudioService: GeminiProvider,
     private readonly ragService: RagService,
     private readonly toolRegistryService: ToolRegistryService,
-    private readonly toolExecutorService: ToolExecutorService,
     private readonly chatOrchestrator: ChatOrchestratorService,
-    private readonly configService: ConfigService,
     private readonly llmModelService: LlmModelService,
+    private readonly billingService: BillingService,
+    private readonly chatEventsService: ChatEventsService,
   ) {
     super();
   }
 
   protected getRepository(): Repository<Chatbot> {
     return this.chatbotRepo;
+  }
+
+  private getProviderFromModel(provider: string | null, model: string): string {
+    if (provider) return provider;
+    if (model.startsWith('gemini:')) return 'gemini';
+    if (model.startsWith('openai:')) return 'openai';
+    return 'unknown';
+  }
+
+  private normalizeModelName(model: string): string {
+    if (model.startsWith('models/')) {
+      return model.slice('models/'.length);
+    }
+
+    const separatorIndex = model.indexOf(':');
+    return separatorIndex >= 0 ? model.slice(separatorIndex + 1) : model;
+  }
+
+  /**
+   * Backend tự suy ra provider từ bảng llm_models theo llm_model.
+   * Fallback tối thiểu để tránh vỡ luồng khi model chưa có trong bảng giá.
+   */
+  private async resolveProviderFromModel(model: string): Promise<string> {
+    const providerFromDb = await this.llmModelService.findProviderByModel(model);
+    if (providerFromDb) return providerFromDb;
+
+    const raw = (model || '').toLowerCase();
+    if (raw.includes('gpt') || raw.includes('openai') || raw.includes('o1')) {
+      return 'openai';
+    }
+    return 'google-ai-studio';
+  }
+
+  async listModelsForSelection(): Promise<
+    { provider: string; model: string; value: string; label: string }[]
+  > {
+    const rows = await this.llmModelService.findAllForPricing();
+
+    return rows.map((row) => {
+      const provider = this.getProviderFromModel(row.provider, row.model);
+      const model = this.normalizeModelName(row.model);
+
+      return {
+        provider,
+        model,
+        value: model,
+        label: row.display_name ?? model,
+      };
+    });
+  }
+
+  async listModelsNormalized(): Promise<string[]> {
+    const rows = await this.llmModelService.findAllForPricing();
+    return rows.map((row) => this.normalizeModelName(row.model));
   }
 
   /**
@@ -81,6 +135,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
     }
 
     // Tạo chatbot
+    const selectedModel = createDto.llm_model ?? 'gemini-2.0-flash-lite';
+    const inferredProvider = await this.resolveProviderFromModel(selectedModel);
+
     const chatbot = this.chatbotRepo.create({
       workspace_id: workspaceId,
       name: createDto.name,
@@ -90,15 +147,14 @@ export class ChatbotsService extends BaseService<Chatbot> {
         createDto.greeting_message ?? 'Xin chào! Tôi có thể giúp gì cho bạn?',
       fallback_message:
         createDto.fallback_message ?? 'Xin lỗi, tôi chưa hiểu câu hỏi của bạn.',
-      conversation_starters:
-        createDto.conversation_starters?.length
-          ? createDto.conversation_starters
-          : DEFAULT_CONVERSATION_STARTERS,
+      conversation_starters: createDto.conversation_starters?.length
+        ? createDto.conversation_starters
+        : DEFAULT_CONVERSATION_STARTERS,
       confidence_threshold: createDto.confidence_threshold ?? 0.7,
       max_context_turns: createDto.max_context_turns ?? 5,
       enable_learning: createDto.enable_learning ?? true,
-      llm_provider: createDto.llm_provider ?? 'google-ai-studio',
-      llm_model: createDto.llm_model ?? 'gemini-2.0-flash-lite',
+      llm_provider: inferredProvider,
+      llm_model: selectedModel,
       temperature: createDto.temperature ?? 0.7,
       max_tokens: createDto.max_tokens ?? 1000,
       enabled: true,
@@ -158,7 +214,13 @@ export class ChatbotsService extends BaseService<Chatbot> {
   ): Promise<Chatbot> {
     const chatbot = await this.findOne(workspaceId, chatbotId);
 
-    Object.assign(chatbot, updateDto);
+    const { llm_provider: _ignoredProvider, ...safeUpdateDto } = updateDto;
+    Object.assign(chatbot, safeUpdateDto);
+    if (updateDto.llm_model !== undefined) {
+      chatbot.llm_provider = await this.resolveProviderFromModel(
+        updateDto.llm_model,
+      );
+    }
     if (
       updateDto.conversation_starters !== undefined &&
       !updateDto.conversation_starters.length
@@ -244,7 +306,9 @@ export class ChatbotsService extends BaseService<Chatbot> {
     cards: any[];
     processingTime: number;
     token_usage?: { input_tokens: number; output_tokens: number } | null;
-    tools_used?: { tool_name: string; args: Record<string, any>; result: any }[] | null;
+    tools_used?:
+      | { tool_name: string; args: Record<string, any>; result: any }[]
+      | null;
   }> {
     const startTime = Date.now();
 
@@ -255,20 +319,28 @@ export class ChatbotsService extends BaseService<Chatbot> {
       throw new ForbiddenException('Chatbot is disabled for this workspace');
     }
 
-    // Kiểm tra conversation tồn tại và thuộc chatbot này
-    const conversation = await this.conversationRepo.findOne({
-      where: { id: chatDto.conversation_id, chatbot_id: chatbotId },
-    });
+    await this.billingService.assertWalletHasCreditsForChat(workspaceId);
 
-    if (!conversation) {
-      throw new NotFoundException(
-        'Conversation not found or does not belong to this chatbot',
-      );
-    }
+    // Kiểm tra conversation tồn tại và thuộc chatbot này
+    const conversation = await this.resolveConversationForChat(
+      workspaceId,
+      chatbotId,
+      userId,
+      chatDto.conversation_id,
+    );
+    const activeConversationId = conversation.id;
+
+    this.chatEventsService.emit({
+      type: 'chat_started',
+      conversation_id: activeConversationId,
+      chatbot_id: chatbotId,
+      timestamp: new Date().toISOString(),
+      message: 'Chat request received',
+    });
 
     // Lưu tin nhắn user vào database
     const userMessage = this.messageRepo.create({
-      conversation: { id: chatDto.conversation_id } as Conversation,
+      conversation: { id: activeConversationId } as Conversation,
       sender_type: 'user',
       sender: { id: userId } as any,
       content: chatDto.message,
@@ -287,52 +359,31 @@ export class ChatbotsService extends BaseService<Chatbot> {
     }
 
     try {
-      let extractedImageContent: string | undefined;
-      if (uploadedImages.length > 0) {
-        const appUrl =
-          this.configService.get<string>('APP_URL') ?? 'http://localhost:4000';
-        const imageUrls = uploadedImages.map(
-          (att: { url: string }) =>
-            `${appUrl.replace(/\/$/, '')}${att.url.startsWith('/') ? att.url : '/' + att.url}`,
-        );
-        const ctx = {
-          workspaceId,
-          userId,
-          sessionId: chatDto.conversation_id,
-          chatbotId,
-        };
-        const texts: string[] = [];
-        for (const url of imageUrls) {
-          try {
-            const result = await this.toolExecutorService.execute(
-              'ocr',
-              { imageUrl: url },
-              ctx,
-            );
-            if (result?.text) texts.push(String(result.text).trim());
-          } catch (err) {
-            this.logger.warn(`OCR failed for image ${url}:`, err);
-          }
-        }
-        if (texts.length > 0) {
-          extractedImageContent = texts.join('\n\n---\n\n');
-        }
-      }
+      const imageInputs =
+        chatDto.images?.map((file) => ({
+          mimeType: file.mimetype,
+          data: file.buffer.toString('base64'),
+        })) ?? [];
 
-      const { response: finalResponseText, files, cards, tokenUsage, toolsUsed } =
-        await this.chatOrchestrator.runChatTurn({
-          workspaceId,
-          chatbotId,
-          userId,
-          conversationId: chatDto.conversation_id,
-          userMessage: chatDto.message,
-          chatbot,
-          extractedImageContent,
-        });
+      const {
+        response: finalResponseText,
+        files,
+        cards,
+        tokenUsage,
+        toolsUsed,
+      } = await this.chatOrchestrator.runChatTurn({
+        workspaceId,
+        chatbotId,
+        userId,
+        conversationId: activeConversationId,
+        userMessage: chatDto.message,
+        chatbot,
+        images: imageInputs,
+      });
 
       // Lưu tin nhắn bot vào database (kèm token usage và tools đã dùng)
       const botMessage = this.messageRepo.create({
-        conversation: { id: chatDto.conversation_id } as Conversation,
+        conversation: { id: activeConversationId } as Conversation,
         sender_type: 'bot',
         sender: null,
         content: finalResponseText,
@@ -344,16 +395,16 @@ export class ChatbotsService extends BaseService<Chatbot> {
       // Save attachments if any
       const responseFiles = files || [];
       if (responseFiles.length > 0) {
-         // Note: We need MessageAttachment repo here, assuming it's cascaded or we inject it
-         // Since we added cascade: true to Message entity, we can just assign and save
-         savedBotMessage.attachments = responseFiles.map((f: any) => ({
-           type: f.type,
-           url: f.url,
-           filename: f.filename,
-           size: f.size,
-           mime_type: f.mime_type
-         })) as any;
-         await this.messageRepo.save(savedBotMessage);
+        // Note: We need MessageAttachment repo here, assuming it's cascaded or we inject it
+        // Since we added cascade: true to Message entity, we can just assign and save
+        savedBotMessage.attachments = responseFiles.map((f: any) => ({
+          type: f.type,
+          url: f.url,
+          filename: f.filename,
+          size: f.size,
+          mime_type: f.mime_type,
+        })) as any;
+        await this.messageRepo.save(savedBotMessage);
       }
 
       const processingTime = Date.now() - startTime;
@@ -362,8 +413,16 @@ export class ChatbotsService extends BaseService<Chatbot> {
         `Chat response generated in ${processingTime}ms for workspace ${workspaceId}`,
       );
 
+      this.chatEventsService.emit({
+        type: 'completed',
+        conversation_id: activeConversationId,
+        chatbot_id: chatbotId,
+        timestamp: new Date().toISOString(),
+        message: 'Final response generated',
+      });
+
       return {
-        conversation_id: chatDto.conversation_id,
+        conversation_id: activeConversationId,
         response: finalResponseText,
         model: chatbot.llm_model,
         files: responseFiles,
@@ -376,13 +435,22 @@ export class ChatbotsService extends BaseService<Chatbot> {
     } catch (error) {
       this.logger.error('Error in chat:', error);
 
+      this.chatEventsService.emit({
+        type: 'failed',
+        conversation_id: activeConversationId,
+        chatbot_id: chatbotId,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        message: 'Chat processing failed',
+      });
+
       const fallbackResponse =
         chatbot.fallback_message ??
         'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.';
 
       // Lưu fallback response vào database
       const botMessage = this.messageRepo.create({
-        conversation: { id: chatDto.conversation_id } as Conversation,
+        conversation: { id: activeConversationId } as Conversation,
         sender_type: 'bot',
         sender: null,
         content: fallbackResponse,
@@ -390,7 +458,7 @@ export class ChatbotsService extends BaseService<Chatbot> {
       await this.messageRepo.save(botMessage);
 
       return {
-        conversation_id: chatDto.conversation_id,
+        conversation_id: activeConversationId,
         response: fallbackResponse,
         model: chatbot.llm_model,
         files: [],
@@ -401,6 +469,50 @@ export class ChatbotsService extends BaseService<Chatbot> {
         tools_used: null,
       };
     }
+  }
+
+  private async resolveConversationForChat(
+    workspaceId: string,
+    chatbotId: string,
+    userId: string,
+    requestedConversationId: string,
+  ): Promise<Conversation> {
+    const matchingConversation = await this.conversationRepo.findOne({
+      where: {
+        id: requestedConversationId,
+        workspace_id: workspaceId,
+        chatbot_id: chatbotId,
+        user_id: userId,
+      },
+    });
+
+    if (matchingConversation) {
+      return matchingConversation;
+    }
+
+    const existingConversation = await this.conversationRepo.findOne({
+      where: { id: requestedConversationId },
+    });
+
+    if (existingConversation) {
+      this.logger.warn(
+        `Conversation ${requestedConversationId} does not match current context. ` +
+          `Creating a new conversation for workspace=${workspaceId}, chatbot=${chatbotId}, user=${userId}.`,
+      );
+    } else {
+      this.logger.warn(
+        `Conversation ${requestedConversationId} not found. Creating a new conversation for workspace=${workspaceId}, chatbot=${chatbotId}, user=${userId}.`,
+      );
+    }
+
+    const newConversation = this.conversationRepo.create({
+      workspace_id: workspaceId,
+      user_id: userId,
+      chatbot_id: chatbotId,
+      started_at: new Date(),
+    });
+
+    return this.conversationRepo.save(newConversation);
   }
 
   /**
@@ -501,5 +613,3 @@ export class ChatbotsService extends BaseService<Chatbot> {
     );
   }
 }
-
-

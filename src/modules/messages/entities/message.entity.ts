@@ -32,5 +32,7 @@ export class Message extends BaseEntity {
 
   /** Tools và kết quả mà chatbot đã gọi cho tin nhắn này. Chỉ có khi sender_type = bot. */
   @Column({ type: 'jsonb', nullable: true })
-  tools_used: { tool_name: string; args: Record<string, any>; result: any }[] | null;
+  tools_used:
+    | { tool_name: string; args: Record<string, any>; result: any }[]
+    | null;
 }

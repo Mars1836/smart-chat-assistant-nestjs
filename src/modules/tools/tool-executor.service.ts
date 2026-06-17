@@ -191,12 +191,11 @@ export class ToolExecutorService {
       typeof params.min_score === 'number' ? params.min_score : undefined;
 
     // Lấy danh sách knowledge mà chatbot này được phép dùng
-    const allowedKnowledgeIds =
-      context.chatbotId
-        ? await this.knowledgeService.getEnabledKnowledgeIdsForChatbot(
-            context.chatbotId,
-          )
-        : [];
+    const allowedKnowledgeIds = context.chatbotId
+      ? await this.knowledgeService.getEnabledKnowledgeIdsForChatbot(
+          context.chatbotId,
+        )
+      : [];
 
     // Nếu caller truyền knowledge_ids thì chỉ cho phép dùng giao giữa requested và allowed
     let knowledgeIds: string[] = [];

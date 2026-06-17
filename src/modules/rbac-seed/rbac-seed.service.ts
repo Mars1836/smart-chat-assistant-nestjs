@@ -139,8 +139,7 @@ export class RbacSeedService implements OnModuleInit {
     const allPermissions = Object.values(WORKSPACE_PERMISSIONS);
 
     const adminPermissions = allPermissions.filter(
-      (p) =>
-        p !== WORKSPACE_PERMISSIONS.WORKSPACE_DELETE,
+      (p) => p !== WORKSPACE_PERMISSIONS.WORKSPACE_DELETE,
     );
 
     const editorPermissions = [
@@ -149,6 +148,11 @@ export class RbacSeedService implements OnModuleInit {
       WORKSPACE_PERMISSIONS.CHATBOT_DELETE,
       WORKSPACE_PERMISSIONS.CHATBOT_VIEW,
       WORKSPACE_PERMISSIONS.CHATBOT_CHAT,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_VIEW,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_CREATE,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_UPDATE,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_DELETE,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_ASSIGN_CHATBOT,
       WORKSPACE_PERMISSIONS.DOCUMENT_UPLOAD,
       WORKSPACE_PERMISSIONS.DOCUMENT_UPDATE,
       WORKSPACE_PERMISSIONS.DOCUMENT_DELETE,
@@ -159,6 +163,7 @@ export class RbacSeedService implements OnModuleInit {
     const viewerPermissions = [
       WORKSPACE_PERMISSIONS.CHATBOT_VIEW,
       WORKSPACE_PERMISSIONS.CHATBOT_CHAT,
+      WORKSPACE_PERMISSIONS.KNOWLEDGE_VIEW,
       WORKSPACE_PERMISSIONS.DOCUMENT_VIEW,
       WORKSPACE_PERMISSIONS.MEMBER_VIEW,
     ];
@@ -178,16 +183,16 @@ export class RbacSeedService implements OnModuleInit {
       if (permission) {
         const exists = await this.rolePermissionRepo.findOne({
           where: {
-             workspace_role_id: role.id,
-             permission_id: permission.id
+            workspace_role_id: role.id,
+            permission_id: permission.id,
           },
         });
 
         if (!exists) {
-            await this.rolePermissionRepo.save({
-                workspace_role_id: role.id,
-                permission_id: permission.id
-            });
+          await this.rolePermissionRepo.save({
+            workspace_role_id: role.id,
+            permission_id: permission.id,
+          });
         }
       }
     }

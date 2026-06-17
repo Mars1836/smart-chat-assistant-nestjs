@@ -47,7 +47,7 @@ export class KnowledgeController {
   @Get()
   @ApiOperation({ summary: 'Get all knowledge bases in workspace' })
   @ApiResponse({ status: 200, description: 'List of knowledge bases' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_VIEW)
   async findAll(
     @Param('workspaceId') workspaceId: string,
   ): Promise<Knowledge[]> {
@@ -57,7 +57,7 @@ export class KnowledgeController {
   @Get(':knowledgeId')
   @ApiOperation({ summary: 'Get knowledge base details with documents' })
   @ApiResponse({ status: 200, description: 'Knowledge base with documents' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_VIEW)
   async findOne(
     @Param('workspaceId') workspaceId: string,
     @Param('knowledgeId') knowledgeId: string,
@@ -68,7 +68,7 @@ export class KnowledgeController {
   @Post()
   @ApiOperation({ summary: 'Create a new knowledge base' })
   @ApiResponse({ status: 201, description: 'Knowledge base created' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_UPLOAD)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_CREATE)
   async create(
     @Param('workspaceId') workspaceId: string,
     @Body() dto: CreateKnowledgeDto,
@@ -80,7 +80,7 @@ export class KnowledgeController {
   @Put(':knowledgeId')
   @ApiOperation({ summary: 'Update knowledge base' })
   @ApiResponse({ status: 200, description: 'Knowledge base updated' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_UPLOAD)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_UPDATE)
   async update(
     @Param('workspaceId') workspaceId: string,
     @Param('knowledgeId') knowledgeId: string,
@@ -93,7 +93,7 @@ export class KnowledgeController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete knowledge base and all its documents' })
   @ApiResponse({ status: 204, description: 'Knowledge base deleted' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.DOCUMENT_DELETE)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_DELETE)
   async remove(
     @Param('workspaceId') workspaceId: string,
     @Param('knowledgeId') knowledgeId: string,
@@ -119,7 +119,7 @@ export class ChatbotKnowledgeController {
     status: 200,
     description: 'List of knowledge bases with enabled status',
   })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_VIEW)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_VIEW)
   async getKnowledgeForChatbot(@Param('chatbotId') chatbotId: string) {
     return this.knowledgeService.getKnowledgeForChatbot(chatbotId);
   }
@@ -127,7 +127,7 @@ export class ChatbotKnowledgeController {
   @Post()
   @ApiOperation({ summary: 'Add knowledge base to chatbot' })
   @ApiResponse({ status: 201, description: 'Knowledge added to chatbot' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_ASSIGN_CHATBOT)
   async addKnowledge(
     @Param('chatbotId') chatbotId: string,
     @Body() dto: AddKnowledgeToChatbotDto,
@@ -143,7 +143,7 @@ export class ChatbotKnowledgeController {
   @Put(':knowledgeId')
   @ApiOperation({ summary: 'Update knowledge config for chatbot' })
   @ApiResponse({ status: 200, description: 'Knowledge config updated' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_ASSIGN_CHATBOT)
   async updateKnowledge(
     @Param('chatbotId') chatbotId: string,
     @Param('knowledgeId') knowledgeId: string,
@@ -160,7 +160,7 @@ export class ChatbotKnowledgeController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove knowledge base from chatbot' })
   @ApiResponse({ status: 204, description: 'Knowledge removed from chatbot' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_ASSIGN_CHATBOT)
   async removeKnowledge(
     @Param('chatbotId') chatbotId: string,
     @Param('knowledgeId') knowledgeId: string,
@@ -174,7 +174,7 @@ export class ChatbotKnowledgeController {
   @Post('batch')
   @ApiOperation({ summary: 'Batch update knowledge selection for chatbot' })
   @ApiResponse({ status: 200, description: 'Knowledge configs updated' })
-  @RequirePermissions(WORKSPACE_PERMISSIONS.CHATBOT_UPDATE)
+  @RequirePermissions(WORKSPACE_PERMISSIONS.KNOWLEDGE_ASSIGN_CHATBOT)
   async batchUpdate(
     @Param('chatbotId') chatbotId: string,
     @Body() dto: BatchUpdateChatbotKnowledgeDto,

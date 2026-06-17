@@ -8,8 +8,6 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { WorkspacePermissionsService } from '../../modules/workspace-permissions/workspace-permissions.service';
 
-
-
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(

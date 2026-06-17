@@ -8,7 +8,9 @@ import { SystemRole } from '../../modules/system-roles/entities/system-role.enti
  *
  * Idempotent: safe to run multiple times.
  */
-export async function seedDefaultUserRole(dataSource: DataSource): Promise<void> {
+export async function seedDefaultUserRole(
+  dataSource: DataSource,
+): Promise<void> {
   const userRepo = dataSource.getRepository(User);
   const systemRoleRepo = dataSource.getRepository(SystemRole);
 
@@ -41,5 +43,7 @@ export async function seedDefaultUserRole(dataSource: DataSource): Promise<void>
     { system_role_id: IsNull(), is_deleted: false },
     { system_role_id: userRole.id },
   );
-  console.log(`  + Assigned role "${userRoleName}" to ${usersWithoutRole} users`);
+  console.log(
+    `  + Assigned role "${userRoleName}" to ${usersWithoutRole} users`,
+  );
 }

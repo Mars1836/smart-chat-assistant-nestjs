@@ -26,7 +26,8 @@ export async function seedSystemAdmin(dataSource: DataSource): Promise<void> {
   if (!adminRole) {
     adminRole = systemRoleRepo.create({
       name: adminRoleName,
-      description: 'Quản trị viên hệ thống - Quản lý toàn bộ server, users, groups.',
+      description:
+        'Quản trị viên hệ thống - Quản lý toàn bộ server, users, groups.',
     });
     adminRole = await systemRoleRepo.save(adminRole);
     console.log(`  + Created system role: ${adminRoleName}`);
@@ -75,4 +76,3 @@ export async function seedSystemAdmin(dataSource: DataSource): Promise<void> {
   console.log(`    Email   : ${adminEmail}`);
   console.log(`    Password: ${adminPassword}`);
 }
-

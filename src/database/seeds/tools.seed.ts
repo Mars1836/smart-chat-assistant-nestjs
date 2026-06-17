@@ -41,9 +41,7 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
   // =====================
   // Cleanup removed tools (safe to run repeatedly)
   // =====================
-  const removedToolNames = [
-    'pollinations_image_generator',
-  ] as const;
+  const removedToolNames = ['pollinations_image_generator'] as const;
 
   const removedTools = await toolRepo.find({
     where: { name: In(removedToolNames) },
@@ -274,6 +272,191 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
     },
 
     // =====================
+    // GOOGLE CALENDAR (Generic API with OAuth)
+    // =====================
+    {
+      name: 'google_calendar',
+      display_name: 'Google Calendar',
+      description:
+        'Access and manage Google Calendar events. Requires OAuth2 authentication.',
+      category: 'builtin',
+      is_enabled: true,
+      executor_type: 'generic_api',
+      executor_config: {
+        base_url: 'https://www.googleapis.com/calendar/v3',
+        auth_type: 'oauth2',
+      },
+      auth_config: {
+        type: 'oauth2',
+        oauth: {
+          authorization_url: 'https://accounts.google.com/o/oauth2/v2/auth',
+          token_url: 'https://oauth2.googleapis.com/token',
+          scopes: [
+            'https://www.googleapis.com/auth/calendar',
+            'https://www.googleapis.com/auth/calendar.events',
+          ],
+        },
+      },
+      actions: [
+        {
+          name: 'list_events',
+          display_name: 'List Events',
+          description:
+            'List events from the user primary calendar. Provide explicit RFC3339 timestamps with timezone in timeMin and timeMax, for example 2026-03-31T00:00:00+07:00.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              timeMin: {
+                type: 'string',
+                description:
+                  'Required start timestamp in RFC3339 format with timezone, for example 2026-03-31T00:00:00+07:00.',
+              },
+              timeMax: {
+                type: 'string',
+                description:
+                  'Required end timestamp in RFC3339 format with timezone, for example 2026-03-31T23:59:59+07:00.',
+              },
+              maxResults: {
+                type: 'number',
+                description: 'Maximum number of events to return. Default 10.',
+              },
+              orderBy: {
+                type: 'string',
+                enum: ['startTime', 'updated'],
+                description: 'Sort order for events. Default startTime.',
+              },
+              q: {
+                type: 'string',
+                description: 'Optional free-text query to filter events.',
+              },
+            },
+            required: ['timeMin', 'timeMax'],
+          },
+          executor_config: {
+            method: 'GET',
+            endpoint: '/calendars/primary/events',
+            params: {
+              query: {
+                timeMin: '{{timeMin}}',
+                timeMax: '{{timeMax}}',
+                maxResults: '{{maxResults}}',
+                orderBy: '{{orderBy}}',
+                q: '{{q}}',
+                singleEvents: 'true',
+              },
+            },
+            success_message:
+              'Retrieved {{_response.items.length}} calendar events from Google Calendar.',
+          },
+          sort_order: 0,
+        },
+        {
+          name: 'get_event',
+          display_name: 'Get Event',
+          description: 'Get details of a Google Calendar event by event ID.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              eventId: {
+                type: 'string',
+                description: 'Google Calendar event ID',
+              },
+            },
+            required: ['eventId'],
+          },
+          executor_config: {
+            method: 'GET',
+            endpoint: '/calendars/primary/events/{{eventId}}',
+          },
+          sort_order: 1,
+        },
+        {
+          name: 'create_event',
+          display_name: 'Create Event',
+          description:
+            'Create a new event on the user primary Google Calendar. Provide explicit RFC3339 timestamps with timezone in startDateTime and endDateTime.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              summary: {
+                type: 'string',
+                description: 'Event title',
+              },
+              description: {
+                type: 'string',
+                description: 'Event description',
+              },
+              location: {
+                type: 'string',
+                description: 'Event location',
+              },
+              startDateTime: {
+                type: 'string',
+                description:
+                  'Required explicit start timestamp in RFC3339 format with timezone, for example 2026-03-31T09:00:00+07:00.',
+              },
+              endDateTime: {
+                type: 'string',
+                description:
+                  'Required explicit end timestamp in RFC3339 format with timezone, for example 2026-03-31T10:00:00+07:00.',
+              },
+              timeZone: {
+                type: 'string',
+                description:
+                  'Time zone, e.g. Asia/Ho_Chi_Minh. Default is Asia/Ho_Chi_Minh.',
+              },
+            },
+            required: ['summary', 'startDateTime', 'endDateTime'],
+          },
+          executor_config: {
+            method: 'POST',
+            endpoint: '/calendars/primary/events',
+            params: {
+              body: {
+                summary: '{{summary}}',
+                description: '{{description}}',
+                location: '{{location}}',
+                start: {
+                  dateTime: '{{startDateTime}}',
+                  timeZone: '{{timeZone}}',
+                },
+                end: {
+                  dateTime: '{{endDateTime}}',
+                  timeZone: '{{timeZone}}',
+                },
+              },
+            },
+            success_message:
+              'Created calendar event "{{_response.summary}}" successfully.',
+          },
+          sort_order: 2,
+        },
+        {
+          name: 'delete_event',
+          display_name: 'Delete Event',
+          description:
+            'Delete an event from the user primary Google Calendar by event ID. If the user only describes the event naturally, the system should list events first, resolve the target event, then call this action.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              eventId: {
+                type: 'string',
+                description: 'Google Calendar event ID to delete',
+              },
+            },
+            required: ['eventId'],
+          },
+          executor_config: {
+            method: 'DELETE',
+            endpoint: '/calendars/primary/events/{{eventId}}',
+            success_message: 'Deleted Google Calendar event successfully.',
+          },
+          sort_order: 3,
+        },
+      ],
+    },
+
+    // =====================
     // DATE & TIME (Function)
     // =====================
     {
@@ -289,7 +472,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_current_time',
           display_name: 'Get Current Time',
-          description: 'Get the current date and time (includes weekday, day, month, year, time)',
+          description:
+            'Get the current date and time (includes weekday, day, month, year, time)',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -335,7 +519,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_current_weather',
           display_name: 'Get Current Weather',
-          description: 'Get current weather data including temperature, conditions, humidity, wind, etc. for a specific city.',
+          description:
+            'Get current weather data including temperature, conditions, humidity, wind, etc. for a specific city.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -345,7 +530,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
               },
               units: {
                 type: 'string',
-                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
+                description:
+                  'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
                 enum: ['metric', 'imperial'],
                 default: 'metric',
               },
@@ -370,7 +556,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_forecast_weather',
           display_name: 'Get 5-Day Forecast',
-          description: 'Get weather forecast for the next 5 days with 3-hour intervals.',
+          description:
+            'Get weather forecast for the next 5 days with 3-hour intervals.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -380,7 +567,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
               },
               units: {
                 type: 'string',
-                description: 'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
+                description:
+                  'Units: "metric" (Celsius), "imperial" (Fahrenheit). Default: metric',
                 enum: ['metric', 'imperial'],
                 default: 'metric',
               },
@@ -403,7 +591,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
         {
           name: 'get_air_pollution',
           display_name: 'Get Air Pollution',
-          description: 'Get current, forecast, and historical air pollution data (AQI, CO, NO, NO2, O3, SO2, PM2.5, PM10, NH3). Requires latitude and longitude.',
+          description:
+            'Get current, forecast, and historical air pollution data (AQI, CO, NO, NO2, O3, SO2, PM2.5, PM10, NH3). Requires latitude and longitude.',
           parameters: {
             type: 'OBJECT',
             properties: {
@@ -427,7 +616,8 @@ export async function seedTools(dataSource: DataSource): Promise<void> {
                 lon: '{{lon}}',
               },
             },
-            success_message: 'Air pollution data retrieved. AQI: {{_response.list.0.main.aqi}}',
+            success_message:
+              'Air pollution data retrieved. AQI: {{_response.list.0.main.aqi}}',
           },
           sort_order: 2,
         },

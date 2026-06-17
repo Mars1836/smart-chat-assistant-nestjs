@@ -9,7 +9,12 @@ import {
   MessageEvent,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -44,10 +49,13 @@ export class BillingController {
   @ApiOperation({
     summary: 'Lịch sử giao dịch ví / token (chỉ Owner & Admin workspace)',
     description:
-      'Giao dịch tiền (topup, refund, adjustment) và lịch sử dùng token (usage). Phân trang, lọc theo type.',
+      'Giao dịch tiền (topup, refund, adjustment) và usage. FE mapping: `amount` luôn là credits (+/-), `credit_amount` là bản sao chuẩn hóa theo credits, `token_amount` chỉ có ý nghĩa với usage (số token đã dùng, lưu âm).',
   })
   @ApiResponse({ status: 200, description: 'Paginated list of transactions' })
-  @ApiResponse({ status: 403, description: 'Chỉ Owner hoặc Admin workspace mới xem được' })
+  @ApiResponse({
+    status: 403,
+    description: 'Chỉ Owner hoặc Admin workspace mới xem được',
+  })
   async getTransactions(
     @Param('workspaceId') workspaceId: string,
     @Query('page') page?: number,
@@ -83,10 +91,14 @@ export class BillingController {
 
   @Sse('wallet/stream')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'SSE cập nhật số dư ví (realtime)',
+    description:
+      'EventSource không gửi header Authorization. Truyền JWT qua query: `?access_token=<jwt>` hoặc `?token=<jwt>`.',
+  })
   walletStream(
     @Param('workspaceId') workspaceId: string,
   ): Observable<MessageEvent> {
     return this.billingService.getWalletStream(workspaceId);
   }
 }
-

@@ -31,7 +31,10 @@ export class LlmModelsController {
   @Get('pricing')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Bảng giá token theo model (cho client tham khảo)' })
-  @ApiResponse({ status: 200, description: 'Danh sách model + giá input/output' })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách model + giá input/output',
+  })
   async getPricing(): Promise<LlmModel[]> {
     return this.llmModelService.findAllForPricing();
   }
@@ -57,7 +60,10 @@ export class LlmModelsController {
   @UseGuards(JwtAuthGuard, SystemAdminGuard)
   @ApiOperation({ summary: 'Tạo bản ghi model mới (admin)' })
   @ApiResponse({ status: 201, description: 'Created' })
-  @ApiResponse({ status: 409, description: 'Conflict (provider+model đã tồn tại)' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict (provider+model đã tồn tại)',
+  })
   async create(@Body() dto: CreateLlmModelDto): Promise<LlmModel> {
     return this.llmModelService.create(dto);
   }
