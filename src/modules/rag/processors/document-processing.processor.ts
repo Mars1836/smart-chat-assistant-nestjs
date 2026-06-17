@@ -39,7 +39,7 @@ export class DocumentProcessingProcessor extends WorkerHost {
 
     try {
       // 1. Start
-      await this.updateProgress(documentId, 10, 'Đang đọc thẻ...');
+      await this.updateProgress(documentId, 10, 'Đang đọc nội dung...');
 
       // 2. Extract (giải mã nếu file đã mã hóa; bỏ qua nếu chưa mã hóa)
       const document = await this.documentRepo.findOne({
