@@ -46,4 +46,6 @@ while [ "$i" -le "$HEALTHCHECK_RETRIES" ]; do
 done
 
 echo "Health check failed after ${HEALTHCHECK_RETRIES} retries"
+docker compose -f "$COMPOSE_FILE" ps
+docker compose -f "$COMPOSE_FILE" logs --tail=200 app
 exit 1
