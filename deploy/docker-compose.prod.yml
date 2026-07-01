@@ -45,6 +45,27 @@ services:
     networks:
       - app_net
 
+  vault:
+    image: hashicorp/vault:1.17.6
+    container_name: smart-chat-vault
+    restart: unless-stopped
+    command: server -config=/vault/config/vault.hcl
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "127.0.0.1:${VAULT_PORT:-8200}:8200"
+    volumes:
+      - vault_data:/vault/file
+      - ./vault/config:/vault/config:ro
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app_net
+
   app:
     image: ${IMAGE_NAME:-ghcr.io/owner/smart-chat-assistant-nestjs}:${IMAGE_TAG:-latest}
     container_name: smart-chat-assistant
@@ -56,6 +77,8 @@ services:
       redis:
         condition: service_healthy
       qdrant:
+        condition: service_started
+      vault:
         condition: service_started
     env_file:
       - .env
@@ -71,6 +94,9 @@ services:
       REDIS_PORT: ${REDIS_PORT:-6379}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       DOCUMENT_STORAGE_DRIVER: ${DOCUMENT_STORAGE_DRIVER:-local}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TRANSIT_KEK_NAME: ${VAULT_TRANSIT_KEK_NAME:-content-kek}
     ports:
       - "${APP_PORT:-4000}:4000"
     volumes:
@@ -97,5 +123,6 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  vault_data:
   app_uploads:
   app_logs:

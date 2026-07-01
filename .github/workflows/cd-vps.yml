@@ -65,7 +65,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "deploy/docker-compose.prod.yml,deploy/scripts/deploy.sh"
+          source: "deploy/docker-compose.prod.yml,deploy/scripts/deploy.sh,deploy/vault/config/vault.hcl,deploy/vault/policies/smart-chat-app.hcl"
           target: ${{ secrets.VPS_DEPLOY_PATH }}
           strip_components: 1
 
@@ -86,6 +86,11 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.VPS_DEPLOY_PATH }}"
-            printf "%s" "$APP_ENV_FILE" > .env
+            if [ -n "$APP_ENV_FILE" ]; then
+              printf "%s" "$APP_ENV_FILE" > .env
+            elif [ ! -f .env ]; then
+              echo "APP_ENV_FILE is empty and .env does not exist on VPS"
+              exit 1
+            fi
             chmod +x ./scripts/deploy.sh
             IMAGE_NAME="$IMAGE_NAME" IMAGE_TAG="$IMAGE_TAG" ./scripts/deploy.sh
