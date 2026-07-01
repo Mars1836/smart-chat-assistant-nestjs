@@ -45,7 +45,7 @@ services:
     image: hashicorp/vault:1.17.6
     container_name: smart-chat-vault
     restart: unless-stopped
-    command: server -config=/vault/config/vault.hcl
+    command: server
     cap_add:
       - IPC_LOCK
     ports:

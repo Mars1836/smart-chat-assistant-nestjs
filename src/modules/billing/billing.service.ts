@@ -441,7 +441,11 @@ export class BillingService {
           const tokenAmount =
             tx.metadata?.token_amount != null
               ? String(tx.metadata.token_amount)
-              : String(-((tx.input_tokens ?? 0) + (tx.output_tokens ?? 0)).toFixed(4));
+              : String(
+                  -((tx.input_tokens ?? 0) + (tx.output_tokens ?? 0)).toFixed(
+                    4,
+                  ),
+                );
 
           let creditAmount: string | null =
             tx.metadata?.credit_amount != null

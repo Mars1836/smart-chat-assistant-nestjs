@@ -36,8 +36,7 @@ export class SpeechService {
 
   private getSttProvider(): string {
     return String(
-      this.configService.get('SPEECH_STT_PROVIDER') ??
-        'google_speech',
+      this.configService.get('SPEECH_STT_PROVIDER') ?? 'google_speech',
     )
       .trim()
       .toLowerCase();

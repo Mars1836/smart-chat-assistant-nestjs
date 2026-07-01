@@ -89,7 +89,9 @@ async function bootstrap() {
     );
     res.setHeader(
       'Access-Control-Allow-Headers',
-      typeof reqHdr === 'string' && reqHdr.length > 0 ? reqHdr : allowedCorsHeaders,
+      typeof reqHdr === 'string' && reqHdr.length > 0
+        ? reqHdr
+        : allowedCorsHeaders,
     );
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Max-Age', '86400');

@@ -84,7 +84,8 @@ export class ChatbotsService extends BaseService<Chatbot> {
    * Fallback tối thiểu để tránh vỡ luồng khi model chưa có trong bảng giá.
    */
   private async resolveProviderFromModel(model: string): Promise<string> {
-    const providerFromDb = await this.llmModelService.findProviderByModel(model);
+    const providerFromDb =
+      await this.llmModelService.findProviderByModel(model);
     if (providerFromDb) return providerFromDb;
 
     const raw = (model || '').toLowerCase();

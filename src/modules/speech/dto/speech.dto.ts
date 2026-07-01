@@ -31,4 +31,3 @@ export class TextToSpeechDto {
   @Max(2)
   speaking_rate?: number;
 }
-

@@ -256,7 +256,9 @@ export class ToolRegistryService {
 
     if (schema && typeof schema === 'object') {
       const out: Record<string, any> = {};
-      for (const [key, value] of Object.entries(schema as Record<string, any>)) {
+      for (const [key, value] of Object.entries(
+        schema as Record<string, any>,
+      )) {
         if (key === 'type' && typeof value === 'string') {
           out[key] = value.toLowerCase();
         } else {

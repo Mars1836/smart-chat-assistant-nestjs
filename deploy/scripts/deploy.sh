@@ -29,8 +29,8 @@ if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_TOKEN" ]; then
 fi
 
 echo "Deploying image: ${IMAGE_NAME}:${IMAGE_TAG}"
-docker compose -f "$COMPOSE_FILE" pull
-docker compose -f "$COMPOSE_FILE" up -d
+docker compose -f "$COMPOSE_FILE" pull app
+docker compose -f "$COMPOSE_FILE" up -d --no-deps app
 docker image prune -f
 
 echo "Running health check: ${HEALTHCHECK_URL}"

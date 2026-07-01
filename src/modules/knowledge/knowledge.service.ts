@@ -49,7 +49,9 @@ export class KnowledgeService {
     };
   }
 
-  private async hydrateKnowledgeStats(knowledge: Knowledge): Promise<Knowledge> {
+  private async hydrateKnowledgeStats(
+    knowledge: Knowledge,
+  ): Promise<Knowledge> {
     const aggregates = await this.getKnowledgeAggregates(knowledge.id);
     knowledge.document_count = aggregates.document_count;
     knowledge.total_chunks = aggregates.total_chunks;

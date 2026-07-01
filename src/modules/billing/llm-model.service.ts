@@ -61,10 +61,7 @@ export class LlmModelService {
   }
 
   /** Thứ tự: provider gốc → alias → suy luận từ tên model (gpt-* → openai, còn lại → gemini). */
-  private providerLookupCandidates(
-    provider: string,
-    model: string,
-  ): string[] {
+  private providerLookupCandidates(provider: string, model: string): string[] {
     const out: string[] = [];
     const p = (provider || '').trim();
     if (p) out.push(p);
