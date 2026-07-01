@@ -1,19 +1,101 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smart-chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-chatbot}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: smart-chat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app_net
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.6
+    container_name: smart-chat-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - app_net
+
   app:
     image: ${IMAGE_NAME:-ghcr.io/owner/smart-chat-assistant-nestjs}:${IMAGE_TAG:-latest}
     container_name: smart-chat-assistant
     restart: unless-stopped
     pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      - PORT=4000
+      NODE_ENV: production
+      PORT: ${PORT:-4000}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-chatbot}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      DOCUMENT_STORAGE_DRIVER: ${DOCUMENT_STORAGE_DRIVER:-local}
     ports:
       - "${APP_PORT:-4000}:4000"
+    volumes:
+      - app_uploads:/app/uploads
+      - app_logs:/app/dist/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:$${PORT:-4000}/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - app_net
 
 networks:
   app_net:
     driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  app_uploads:
+  app_logs:
