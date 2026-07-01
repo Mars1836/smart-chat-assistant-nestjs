@@ -3,6 +3,7 @@ import 'reflect-metadata';
 
 import { DataSource } from 'typeorm';
 import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+import { join } from 'path';
 import { config } from 'dotenv';
 import { seedTools } from './tools.seed';
 import { seedSystemAdmin } from './system-admin.seed';
@@ -13,6 +14,11 @@ import { seedWorkspaceEncryptionKeys } from './workspace-encryption-keys.seed';
 // Load environment variables
 config();
 
+const isCompiled = __filename.endsWith('.js');
+const entitiesPath = isCompiled
+  ? join(__dirname, '..', '..', 'modules', '**', '*.entity.js')
+  : 'src/modules/**/*.entity.ts';
+
 const dataSourceOptions: PostgresConnectionOptions = {
   type: 'postgres',
   host: process.env.DB_HOST ?? 'localhost',
@@ -20,7 +26,7 @@ const dataSourceOptions: PostgresConnectionOptions = {
   username: process.env.DB_USERNAME ?? 'postgres',
   password: process.env.DB_PASSWORD ?? 'postgres',
   database: process.env.DB_NAME ?? 'chatbot',
-  entities: ['src/modules/**/*.entity.ts'],
+  entities: [entitiesPath],
   synchronize: false, // Don't auto sync in seed script
 };
 

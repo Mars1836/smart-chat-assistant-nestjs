@@ -21,6 +21,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "tsx src/database/seeds/seed.ts",
+    "seed:prod": "node dist/src/database/seeds/seed.js",
     "migrate:documents:gcs": "tsx scripts/migrate-documents-to-gcs.ts",
     "backup:postgres": "tsx scripts/backup-postgres.ts"
   },

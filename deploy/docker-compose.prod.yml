@@ -10,11 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
-        ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -29,7 +25,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -49,16 +45,18 @@ services:
     image: hashicorp/vault:1.17.6
     container_name: smart-chat-vault
     restart: unless-stopped
-    command: server -config=/vault/config/vault.hcl
+    command: server
     cap_add:
       - IPC_LOCK
     ports:
       - "127.0.0.1:${VAULT_PORT:-8200}:8200"
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
     volumes:
       - vault_data:/vault/file
       - ./vault/config:/vault/config:ro
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: [ "CMD", "vault", "status" ]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -103,11 +101,7 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/dist/logs
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q --spider http://127.0.0.1:$${PORT:-4000}/ || exit 1",
-        ]
+      test: [ "CMD-SHELL", "wget -q --spider http://127.0.0.1:$${PORT:-4000}/ || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 5
